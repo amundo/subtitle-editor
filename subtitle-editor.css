@@ -1,0 +1,41 @@
+@import './cue-editor/cue-editor.css';
+
+subtitle-editor {
+  font-family: system-ui, sans-serif;
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: 1rem;
+  padding: 1rem;
+  box-sizing: border-box;
+
+  video {
+    width: 100%;
+    max-height: 60vh;
+    background: #000;
+  }
+
+  .controls {
+    margin-bottom: 1rem;
+
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+  }
+
+  .cue-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: .5rem;
+  }
+
+  .cue-list {
+    max-height: 80vh;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: .5rem;
+    border-radius: .25rem;
+    background: #fafafa;
+  }
+}

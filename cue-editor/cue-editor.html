@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>  
+  <title>&lt;cue-editor></title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width">
+  <link rel="stylesheet" href="cue-editor.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22/>">
+</head>
+<body>
+
+  <cue-editor id="demo"></cue-editor>  
+
+  <script type="module">
+    import { CueEditor } from './CueEditor.js'
+
+    const ce = document.getElementById('demo')
+
+    // Optional: override default dummy data with your own test cue
+    ce.data = {
+      id: 1,
+      start: 0.05,
+      end: 5.39,
+      text: "okay guys welcome we're here today at"
+    }
+
+    // Optional: hook up a real video element:
+    // const video = document.querySelector('video')
+    // ce.video = video
+  </script>
+
+</body>
+</html>
