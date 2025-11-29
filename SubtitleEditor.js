@@ -1,3 +1,4 @@
+// SubtitleEditor.js
 import './cue-editor/CueEditor.js'
 
 class SubtitleEditor extends HTMLElement {
@@ -5,6 +6,17 @@ class SubtitleEditor extends HTMLElement {
     super()
     this.cues = []
     this.previewEnd = null
+
+    // audio analysis
+    this.audioBuffer = null
+    this.envelope = null
+    this.frameDuration = null
+    this.valleys = null
+
+    // active cue for keyboard shortcuts
+    this.activeCue = null
+    this.activeCueElement = null
+
     this._onKeyDown = this._onKeyDown.bind(this)
   }
 
@@ -20,28 +32,33 @@ class SubtitleEditor extends HTMLElement {
 
   renderShell() {
     this.innerHTML = `
-      <div>
-        <div class="controls">
-          <label>Video:
-            <input type="file" data-role="videoFile" accept="video/*">
-          </label>
-          <label>Subtitles (.vtt):
-            <input type="file" data-role="vttFile" accept=".vtt">
-          </label>
+      <div class="subtitle-editor">
+        <div class="media-column">
+          <div class="controls">
+            <label>Video:
+              <input type="file" data-role="videoFile" accept="video/*">
+            </label>
+            <label>Subtitles (.vtt):
+              <input type="file" data-role="vttFile" accept=".vtt">
+            </label>
+          </div>
+          <video data-role="video" controls></video>
+          <div class="current-time-row">
+            Current time:
+            <span data-role="currentTime" class="time-label">00:00:00.000</span>
+          </div>
+          <p class="hint">
+            Esc: play/pause · [ set start to current time · ] set end to current time
+          </p>
         </div>
-        <video data-role="video" controls></video>
-        <div style="margin-top:.5rem;">
-          Current time:
-          <span data-role="currentTime" class="time-label">00:00:00.000</span>
-        </div>
-      </div>
 
-      <div>
-        <div class="cue-panel-header">
-          <strong>Cues</strong>
-          <button data-role="downloadBtn" disabled>Download updated VTT</button>
+        <div class="cues-column">
+          <div class="cue-panel-header">
+            <strong>Cues</strong>
+            <button data-role="downloadBtn" disabled>Download updated VTT</button>
+          </div>
+          <div data-role="cueList" class="cue-list"></div>
         </div>
-        <div data-role="cueList" class="cue-list"></div>
       </div>
     `
   }
@@ -68,6 +85,10 @@ class SubtitleEditor extends HTMLElement {
       const file = e.target.files[0]
       if (!file) return
       this.video.src = URL.createObjectURL(file)
+      // kick off async audio analysis
+      this.initAudioAnalysis(file).catch(err => {
+        console.error('Audio analysis failed:', err)
+      })
     })
 
     this.vttFileInput.addEventListener('change', e => {
@@ -98,7 +119,103 @@ class SubtitleEditor extends HTMLElement {
     if (e.key === 'Escape') {
       if (this.video.paused) this.video.play()
       else this.video.pause()
+      return
     }
+
+    if (!this.activeCue) return
+
+    if (e.key === '[') {
+      // set start to current time
+      this.activeCue.start = this.video.currentTime
+      if (this.activeCue.start > this.activeCue.end) {
+        this.activeCue.start = this.activeCue.end
+      }
+      this.renderCues()
+    } else if (e.key === ']') {
+      // set end to current time
+      this.activeCue.end = this.video.currentTime
+      if (this.activeCue.end < this.activeCue.start) {
+        this.activeCue.end = this.activeCue.start
+      }
+      this.renderCues()
+    }
+  }
+
+  // ---------- audio analysis ----------
+
+  async initAudioAnalysis(file) {
+    const AC = window.AudioContext || window.webkitAudioContext
+    if (!AC) {
+      console.warn('Web Audio API not available; waveform disabled')
+      return
+    }
+
+    const audioCtx = new AC()
+    const arrayBuffer = await file.arrayBuffer()
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer)
+
+    this.audioBuffer = audioBuffer
+
+    const { envelope, frameDuration, valleys } =
+      this.buildEnvelopeAndValleys(audioBuffer)
+
+    this.envelope = envelope
+    this.frameDuration = frameDuration
+    this.valleys = valleys
+
+    // re-render cues so they can show waveforms
+    if (this.cues.length) {
+      this.renderCues()
+    }
+  }
+
+  buildEnvelopeAndValleys(audioBuffer) {
+    const channelData = audioBuffer.getChannelData(0)
+    const sampleRate = audioBuffer.sampleRate
+    const windowSize = 2048 // samples per envelope frame
+
+    const envelope = []
+    for (let i = 0; i < channelData.length; i += windowSize) {
+      let sum = 0
+      let count = 0
+      for (let j = i; j < i + windowSize && j < channelData.length; j++) {
+        const v = channelData[j]
+        sum += v * v
+        count++
+      }
+      const rms = Math.sqrt(sum / count)
+      envelope.push(rms)
+    }
+
+    // very simple valley detection on the smoothed envelope
+    const valleys = []
+    for (let i = 1; i < envelope.length - 1; i++) {
+      if (envelope[i] < envelope[i - 1] && envelope[i] <= envelope[i + 1]) {
+        valleys.push(i)
+      }
+    }
+
+    const frameDuration = windowSize / sampleRate
+    return { envelope, frameDuration, valleys }
+  }
+
+  findNextValleyTime(afterTime) {
+    if (!this.valleys || !this.frameDuration) return afterTime
+    const startIndex = Math.floor(afterTime / this.frameDuration)
+    const idx = this.valleys.find(i => i > startIndex)
+    return idx != null ? idx * this.frameDuration : afterTime
+  }
+
+  findPrevValleyTime(beforeTime) {
+    if (!this.valleys || !this.frameDuration) return beforeTime
+    const startIndex = Math.floor(beforeTime / this.frameDuration)
+    for (let k = this.valleys.length - 1; k >= 0; k--) {
+      const i = this.valleys[k]
+      if (i * this.frameDuration < beforeTime && i < startIndex) {
+        return i * this.frameDuration
+      }
+    }
+    return beforeTime
   }
 
   // ---------- time helpers ----------
@@ -108,13 +225,15 @@ class SubtitleEditor extends HTMLElement {
     const h = Math.floor(s / 3600)
     const m = Math.floor((s % 3600) / 60)
     const sec = (s % 60).toFixed(3)
-    return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(6,'0')}`
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(
+      sec
+    ).padStart(6, '0')}`
   }
 
   parseTime(str) {
     const m = str.match(/(\d+):(\d+):(\d+\.\d+)/)
     if (!m) return 0
-    return (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3])
+    return +m[1] * 3600 + +m[2] * 60 + +m[3]
   }
 
   // ---------- VTT parsing/building ----------
@@ -167,6 +286,15 @@ class SubtitleEditor extends HTMLElement {
 
   // ---------- cue rendering ----------
 
+  setActiveCue(cue, element) {
+    this.activeCue = cue
+    if (this.activeCueElement && this.activeCueElement !== element) {
+      this.activeCueElement.classList.remove('is-active')
+    }
+    this.activeCueElement = element
+    if (element) element.classList.add('is-active')
+  }
+
   renderCues() {
     this.cueList.innerHTML = ''
 
@@ -174,14 +302,49 @@ class SubtitleEditor extends HTMLElement {
       const ce = document.createElement('cue-editor')
       ce.data = cue
       ce.video = this.video
-      ce.onCueChange = () => {
-        // we already mutate the same cue object; nothing else needed now
-      }
-      ce.onPlayCue = (c) => {
+      ce.formatTime = this.formatTime.bind(this)
+
+      // waveform props (will be null until analysis is ready)
+      ce.envelope = this.envelope
+      ce.frameDuration = this.frameDuration
+      ce.contextWindow = 0.75
+
+      // callbacks
+      ce.onPlayCue = c => {
         this.previewEnd = c.end
         this.video.currentTime = c.start
         this.video.play()
       }
+
+      ce.onSnapStartToNow = () => {
+        cue.start = this.video.currentTime
+        if (cue.start > cue.end) cue.start = cue.end
+        this.renderCues()
+      }
+
+      ce.onSnapEndToNow = () => {
+        cue.end = this.video.currentTime
+        if (cue.end < cue.start) cue.end = cue.start
+        this.renderCues()
+      }
+
+      ce.onExtendStartBackward = () => {
+        cue.start = this.findPrevValleyTime(cue.start)
+        this.renderCues()
+      }
+
+      ce.onExtendEndForward = () => {
+        cue.end = this.findNextValleyTime(cue.end)
+        this.renderCues()
+      }
+
+      ce.addEventListener('focusin', () => {
+        this.setActiveCue(cue, ce)
+      })
+      ce.addEventListener('click', () => {
+        this.setActiveCue(cue, ce)
+      })
+
       this.cueList.appendChild(ce)
     })
   }

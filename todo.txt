@@ -1,0 +1,13 @@
+todo
+
+fix line appearance; use [0,y1; end,y2;<points…>; end,0; 0,0] path
+fix button placement
+add directions for add/delete lump at end/start
+simplify timestamps
+remove "start:" and "end:" from labels
+make target/time/
+fix joints between previous/current/next in waveform
+make it possible to directly drag on the waveform to adjust
+fade waveform on cues that aren't currently being edited
+auto advance option to keep the current cue editor in the same place when editing cues
+add keyboard shortcuts for next/previous cue

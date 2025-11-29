@@ -1,43 +1,87 @@
-cue-editor {
-  display: block;
-  max-width: 600px;
-  margin: 1rem auto;
-  padding: .75rem;
-  border: 1px solid #ccc;
-  border-radius: .5rem;
-  background: #fafafa;
-  font-family: system-ui, sans-serif;
+/* cue-editor/cue-editor.css */
 
-  textarea {
-    width: 100%;
-    height: 3rem;
-    box-sizing: border-box;
-    resize: vertical;
-    font-family: inherit;
-  }
+.cue-editor {
+  border: 1px solid #222;
+  padding: 0.75rem 1rem 1rem;
+  margin-bottom: 1rem;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #fff;
+}
 
-  .row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: .5rem;
-    margin-top: .25rem;
-  }
+.cue-editor textarea {
+  font-family: "Courier New", ui-monospace, monospace;
+}
 
-  .time-label {
-    font-family: monospace;
-    padding: 0.15rem 0.3rem;
-    border-radius: .2rem;
-    background: #f5f5f5;
-    border: 1px solid #ddd;
-  }
+.cue-editor .cue-waveform-wrapper {
+  margin-bottom: 0.4rem;
+}
 
-  button {
-    border-radius: .25rem;
-    border: 1px solid #ccc;
-    background: #f0f0f0;
-    padding: 0.2rem 0.45rem;
-    font-size: 0.85rem;
-    cursor: pointer;
-  }
+.cue-editor .cue-waveform {
+  width: 100%;
+  height: 40px;
+}
+
+.cue-editor .cue-waveform path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cue-editor .cue-waveform .wf-prev,
+.cue-editor .cue-waveform .wf-next {
+  stroke: #cfd4da;
+  opacity: 0.9;
+}
+
+.cue-editor .cue-waveform .wf-current {
+  stroke: #6cb6ff;
+  stroke-width: 2;
+  opacity: 1;
+}
+
+.cue-editor .cue-time-row {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
+.cue-editor .time-button {
+  border: 1px solid #d0d7de;
+  background: #f6f8fa;
+  padding: 0.1rem 0.35rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.cue-editor .time-button:hover {
+  background: #eaeef2;
+}
+
+.cue-editor .time-row-spacer {
+  flex: 1;
+}
+
+.cue-editor .play-button {
+  margin-left: 0.25rem;
+}
+
+.cue-editor .cue-text {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+  padding: 0.5rem;
+  border-radius: 2px;
+  border: 1px solid #222;
+}
+
+/* highlight active cue set by SubtitleEditor */
+cue-editor.is-active .cue-editor {
+  box-shadow: 0 0 0 2px #6cb6ff;
 }
