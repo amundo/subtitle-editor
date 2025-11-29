@@ -1,8 +1,9 @@
 // cue-editor/CueEditor.js
 class CueEditor extends HTMLElement {
+  #data = null
   constructor() {
     super()
-    this._data = null
+    this.#data = null
     this.video = null
     this.formatTime = seconds => seconds.toFixed(3)
 
@@ -24,24 +25,23 @@ class CueEditor extends HTMLElement {
   }
 
   set data(cue) {
-    this._data = cue
+    this.#data = cue
     this.render()
   }
 
   get data() {
-    return this._data
+    return this.#data
   }
 
   render() {
-    if (!this._data) {
+    if (!this.#data) {
       this.innerHTML = ''
       return
     }
 
-    const { start, end, text } = this._data
+    const { start, end, text } = this.#data
 
     this.innerHTML = `
-      <div class="cue-editor">
         <div class="cue-waveform-wrapper">
           <svg class="cue-waveform" viewBox="0 0 100 40" preserveAspectRatio="none"
                data-role="waveform"></svg>
@@ -94,7 +94,6 @@ class CueEditor extends HTMLElement {
         </div>
 
         <textarea class="cue-text" data-role="text">${text ?? ''}</textarea>
-      </div>
     `
 
     this.cacheEls()
@@ -111,17 +110,17 @@ class CueEditor extends HTMLElement {
   }
 
   bindEvents() {
-    const { start, end } = this._data
+    const { start, end } = this.#data
 
     this.querySelector('[data-role="jumpStart"]').addEventListener('click', () => {
       if (!this.video) return
-      this.video.currentTime = this._data.start
+      this.video.currentTime = this.#data.start
       this.video.play()
     })
 
     this.querySelector('[data-role="jumpEnd"]').addEventListener('click', () => {
       if (!this.video) return
-      this.video.currentTime = this._data.end
+      this.video.currentTime = this.#data.end
       this.video.play()
     })
 
@@ -156,22 +155,22 @@ class CueEditor extends HTMLElement {
     const playBtn = this.querySelector('[data-role="playCue"]')
     if (playBtn) {
       playBtn.addEventListener('click', () => {
-        if (this.onPlayCue) this.onPlayCue(this._data)
+        if (this.onPlayCue) this.onPlayCue(this.#data)
       })
     }
 
     this.textarea.addEventListener('input', () => {
-      this._data.text = this.textarea.value
+      this.#data.text = this.textarea.value
     })
   }
 
   updateTimeLabels() {
-    if (!this._data) return
+    if (!this.#data) return
     if (this.startLabel) {
-      this.startLabel.textContent = this.formatTime(this._data.start)
+      this.startLabel.textContent = this.formatTime(this.#data.start)
     }
     if (this.endLabel) {
-      this.endLabel.textContent = this.formatTime(this._data.end)
+      this.endLabel.textContent = this.formatTime(this.#data.end)
     }
   }
 
@@ -180,7 +179,7 @@ class CueEditor extends HTMLElement {
       !this.waveformSvg ||
       !this.envelope ||
       !this.frameDuration ||
-      !this._data
+      !this.#data
     ) {
       if (this.waveformSvg) this.waveformSvg.innerHTML = ''
       return
@@ -190,8 +189,8 @@ class CueEditor extends HTMLElement {
     const fd = this.frameDuration
     const contextWindow = this.contextWindow || 0.75
 
-    const start = this._data.start
-    const end = this._data.end
+    const start = this.#data.start
+    const end = this.#data.end
     const duration = env.length * fd
 
     const tPrevStart = Math.max(0, start - contextWindow)

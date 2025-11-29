@@ -1,0 +1,366 @@
+/* colors.css
+   OKLCH-based design system in one file
+   - Brand tokens
+   - Semantic tokens
+   - Shade ramps
+   - Functional tokens (buttons, surfaces, borders)
+   - Utility classes
+   - Dark mode
+*/
+
+:root {
+  /* === Brand tokens (identity, rarely change) === */
+  --brand-primary:   oklch(43.688% 0.19818 296.051);
+  --brand-secondary: oklch(57.791% 0.26314 330.269);
+  --brand-accent:    oklch(91.096% 0.18417 104.821);
+
+  --brand-bg:        oklch(99% 0.01 220);
+  --brand-fg:        oklch(20% 0.10 230);
+
+  /* === Primary ramp (blue-ish) === */
+  --primary-10:  oklch(92% 0.20 220);
+  --primary-20:  oklch(80% 0.20 220);
+  --primary-30:  oklch(70% 0.20 220);
+  --primary-40:  oklch(65% 0.20 220);
+  --primary-50:  oklch(60% 0.20 220); /* base */
+  --primary-60:  oklch(52% 0.20 220);
+  --primary-70:  oklch(45% 0.20 220);
+  --primary-80:  oklch(38% 0.20 220);
+  --primary-90:  oklch(30% 0.20 220);
+
+  /* === Secondary ramp (slightly more violet) === */
+  --secondary-10:  oklch(92% 0.20 240);
+  --secondary-20:  oklch(82% 0.20 240);
+  --secondary-30:  oklch(72% 0.20 240);
+  --secondary-40:  oklch(60% 0.20 240);
+  --secondary-50:  oklch(50% 0.20 240); /* base */
+  --secondary-60:  oklch(42% 0.20 240);
+  --secondary-70:  oklch(35% 0.20 240);
+  --secondary-80:  oklch(28% 0.20 240);
+  --secondary-90:  oklch(22% 0.20 240);
+
+  /* === Accent ramp (warm) === */
+  --accent-10:  oklch(95% 0.10 47);
+  --accent-20:  oklch(88% 0.10 47);
+  --accent-30:  oklch(80% 0.10 47);
+  --accent-40:  oklch(75% 0.10 47);
+  --accent-50:  oklch(70% 0.10 47); /* base */
+  --accent-60:  oklch(62% 0.10 47);
+  --accent-70:  oklch(55% 0.10 47);
+  --accent-80:  oklch(47% 0.10 47);
+  --accent-90:  oklch(40% 0.10 47);
+
+  /* === Neutrals derived from brand bg/fg === */
+  --neutral-0:   var(--brand-bg);
+  --neutral-50:  oklch(90% 0.01 220);
+  --neutral-100: oklch(80% 0.01 220);
+  --neutral-200: oklch(70% 0.01 220);
+  --neutral-300: oklch(60% 0.01 220);
+  --neutral-400: oklch(50% 0.01 220);
+  --neutral-500: oklch(40% 0.02 230);
+  --neutral-600: oklch(32% 0.02 230);
+  --neutral-700: oklch(25% 0.03 230);
+  --neutral-800: oklch(18% 0.03 230);
+  --neutral-900: var(--brand-fg);
+
+  /* === Semantic tokens === */
+  --color-bg:         var(--neutral-0);
+  --color-bg-muted:   var(--neutral-50);
+  --color-bg-subtle:  var(--neutral-100);
+
+  --color-text:       var(--neutral-900);
+  --color-text-muted: var(--neutral-600);
+  --color-text-soft:  var(--neutral-500);
+
+  --color-primary:        var(--primary-50);
+  --color-primary-soft:   var(--primary-20);
+  --color-primary-strong: var(--primary-70);
+  --color-primary-text:   white;
+
+  --color-secondary:        var(--secondary-50);
+  --color-secondary-soft:   var(--secondary-20);
+  --color-secondary-strong: var(--secondary-70);
+  --color-secondary-text:   white;
+
+  --color-accent:      var(--accent-50);
+  --color-accent-soft: var(--accent-20);
+  --color-accent-text: var(--neutral-900);
+
+  --color-border:        var(--neutral-200);
+  --color-border-strong: var(--neutral-400);
+
+  --color-focus-ring: var(--accent-60);
+
+  /* === Functional tokens === */
+
+  /* Surfaces */
+  --surface-1: var(--color-bg);
+  --surface-2: var(--color-bg-muted);
+  --surface-3: var(--color-bg-subtle);
+
+  /* Buttons */
+  --button-buttonprimary-bg:         var(--color-primary);
+  --button-primary-bg-hover:   var(--primary-40);
+  --button-primary-bg-active:  var(--primary-60);
+  --button-primary-text:       var(--color-primary-text);
+
+  --button-secondary-bg:        var(--color-secondary);
+  --button-secondary-bg-hover:  var(--secondary-40);
+  --button-secondary-bg-active: var(--secondary-60);
+  --button-secondary-text:      var(--color-secondary-text);
+
+  --button-ghost-bg:        transparent;
+  --button-ghost-bg-hover:  var(--neutral-100);
+  --button-ghost-bg-active: var(--neutral-200);
+  --button-ghost-text:      var(--color-text);
+
+  /* Inputs */
+  --input-bg:          var(--surface-1);
+  --input-border:      var(--color-border);
+  --input-border-focus: var(--color-focus-ring);
+  --input-text:        var(--color-text);
+  --input-placeholder: var(--color-text-muted);
+
+  /* Cards */
+  --card-bg:         var(--surface-1);
+  --card-border:     var(--color-border);
+  --card-shadow:     0 12px 30px oklch(0% 0 0 / 0.08);
+  --card-radius:     0.75rem;
+  --card-padding:    1rem;
+
+  /* Focus outline */
+  --focus-outline-width: 2px;
+  --focus-outline-style: solid;
+
+  /* Global typography tokens (optional) */
+  --font-sans: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+}
+
+/* === Base styles (optional but handy) === */
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+}
+
+/* Focus visible helper */
+:where(a, button, input, textarea, select) {
+  outline: none;
+}
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: var(--focus-outline-width) var(--focus-outline-style) var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* === Buttons === */
+
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 0.5rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease-out,
+    border-color 120ms ease-out,
+    transform 80ms ease-out,
+    box-shadow 80ms ease-out;
+}
+
+button:active,
+button:active {
+  transform: translateY(1px);
+}
+
+/* Primary button */
+.button-primary {
+  background-color: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-color: color-mix(in oklch, var(--button-primary-bg) 70%, black 30%);
+  box-shadow: 0 10px 20px oklch(0% 0 0 / 0.18);
+}
+
+.button-primary:hover {
+  background-color: var(--button-primary-bg-hover);
+}
+
+.button-primary:active {
+  background-color: var(--button-primary-bg-active);
+  box-shadow: 0 4px 10px oklch(0% 0 0 / 0.2);
+}
+
+/* Secondary button */
+.button-secondary {
+  background-color: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border-color: color-mix(in oklch, var(--button-secondary-bg) 70%, black 30%);
+}
+
+.button-secondary:hover {
+  background-color: var(--button-secondary-bg-hover);
+}
+
+.button-secondary:active {
+  background-color: var(--button-secondary-bg-active);
+}
+
+/* Ghost button */
+.button-ghost {
+  background-color: var(--button-ghost-bg);
+  color: var(--button-ghost-text);
+  border-color: transparent;
+}
+
+.button-ghost:hover {
+  background-color: var(--button-ghost-bg-hover);
+}
+
+.button-ghost:active {
+  background-color: var(--button-ghost-bg-active);
+}
+
+/* === Inputs === */
+
+input,
+textarea,
+select,
+input[type="text"],
+input[type="email"],
+input[type="search"],
+input[type="number"],
+input[type="password"] {
+  background-color: var(--input-bg);
+  color: var(--input-text);
+  border-radius: 0.5rem;
+  border: 1px solid var(--input-border);
+  padding: 0.45rem 0.6rem;
+  font-size: var(--text-sm);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* === Cards / Surfaces === */
+
+.card {
+  background-color: var(--card-bg);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  box-shadow: var(--card-shadow);
+  padding: var(--card-padding);
+}
+
+.surface-1 {
+  background-color: var(--surface-1);
+}
+
+.surface-2 {
+  background-color: var(--surface-2);
+}
+
+.surface-3 {
+  background-color: var(--surface-3);
+}
+
+/* === Simple border utilities === */
+
+.border {
+  border: 1px solid var(--color-border);
+}
+
+.border-strong {
+  border: 1px solid var(--color-border-strong);
+}
+
+.rounded {
+  border-radius: 0.5rem;
+}
+
+.rounded-full {
+  border-radius: 999px;
+}
+
+/* === Swatch utilities for debugging palette === */
+
+.swatch {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.5rem;
+  border: 1px solid oklch(0% 0 0 / 0.1);
+}
+
+/* background shortcuts */
+.bg-primary { background-color: var(--color-primary); }
+.bg-secondary { background-color: var(--color-secondary); }
+.bg-accent { background-color: var(--color-accent); }
+.bg-surface-1 { background-color: var(--surface-1); }
+.bg-surface-2 { background-color: var(--surface-2); }
+.bg-surface-3 { background-color: var(--surface-3); }
+
+/* text color shortcuts */
+.text-primary { color: var(--color-primary); }
+.text-secondary { color: var(--color-secondary); }
+.text-accent { color: var(--color-accent); }
+.text-muted { color: var(--color-text-muted); }
+
+/* spacing helpers (very minimal) */
+.stack-sm > * + * {
+  margin-top: 0.5rem;
+}
+
+.stack-md > * + * {
+  margin-top: 1rem;
+}
+
+/* === Dark mode variant === */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:        oklch(16% 0.02 230);
+    --color-bg-muted:  oklch(20% 0.02 230);
+    --color-bg-subtle: oklch(25% 0.02 230);
+
+    --color-text:       oklch(96% 0.02 230);
+    --color-text-muted: oklch(80% 0.02 230);
+    --color-text-soft:  oklch(72% 0.02 230);
+
+    --surface-1: var(--color-bg);
+    --surface-2: var(--color-bg-muted);
+    --surface-3: var(--color-bg-subtle);
+
+    --color-border:        oklch(35% 0.02 230);
+    --color-border-strong: oklch(50% 0.02 230);
+
+    --card-bg:     var(--surface-1);
+    --card-border: var(--color-border);
+
+    --input-bg:     oklch(20% 0.02 230);
+    --input-border: var(--color-border);
+
+    --button-ghost-bg-hover:  oklch(25% 0.02 230);
+    --button-ghost-bg-active: oklch(30% 0.02 230);
+  }
+}

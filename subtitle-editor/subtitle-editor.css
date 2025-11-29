@@ -1,3 +1,4 @@
+@import './colors.css';
 @import './cue-editor/cue-editor.css';
 
 subtitle-editor {
@@ -11,7 +12,7 @@ subtitle-editor {
   video {
     width: 100%;
     max-height: 60vh;
-    background: #000;
+    background: var(--foreground);
   }
 
   .controls {
