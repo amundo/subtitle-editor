@@ -22,13 +22,20 @@ Rather than using a single global waveform to represent the whole media file, an
 
 This tool is a web application built with Web Standards. As of now it is purely client-side. 
 
+### Audio analysis
+
+Waveforms are created by analyzing the audio data using the Web Audio API. The audio file is loaded into an AudioBuffer, and then the samples are processed to create a visual representation of the waveform. Simple waveforms are rendered with lightweight `SVG` elements for scalability and performance. 
+
+
+
 ## Other tools for comparison
 
 There are several tools available for editing subtitles, such as:
 
 * [Aegisub](http://www.aegisub.org/)
+* [VTT Editor](https://www.nikse.dk/SubtitleEdit/Online)
 * [Subtitle Edit](https://www.nikse.dk/SubtitleEdit)
 * [Jubler](http://www.jubler.org/)
 * [Amara](https://amara.org/)
 * [YouTube Studio](https://studio.youtube.com/)
-* [VTT Editor](https://www.nikse.dk/SubtitleEdit/Online)
+

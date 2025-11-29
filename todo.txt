@@ -11,3 +11,4 @@ make it possible to directly drag on the waveform to adjust
 fade waveform on cues that aren't currently being edited
 auto advance option to keep the current cue editor in the same place when editing cues
 add keyboard shortcuts for next/previous cue
+handle scenario of starting from scratch with no subtitles loaded

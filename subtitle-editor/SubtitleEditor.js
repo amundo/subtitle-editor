@@ -32,7 +32,6 @@ class SubtitleEditor extends HTMLElement {
 
   renderShell() {
     this.innerHTML = `
-      <div class="subtitle-editor">
         <div class="media-column">
           <div class="controls">
             <label>Video:
@@ -59,7 +58,6 @@ class SubtitleEditor extends HTMLElement {
           </div>
           <div data-role="cueList" class="cue-list"></div>
         </div>
-      </div>
     `
   }
 
