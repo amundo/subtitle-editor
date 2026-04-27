@@ -225,6 +225,7 @@ class CueEditor extends HTMLElement {
     })
 
     this.querySelector('[data-role="deleteCue"]')?.addEventListener('click', () => {
+      if (!window.confirm('Delete this cue? This cannot be undone.')) return
       if (this.onDeleteCue) this.onDeleteCue()
     })
   }

@@ -46,12 +46,17 @@ class SubtitleEditor extends HTMLElement {
     this.innerHTML = `
         <div class="media-column">
           <div class="controls">
-            <label>Media:
-              <input type="file" data-role="videoFile" accept="video/*,audio/*">
-            </label>
-            <label>aTrain JSON:
-              <input type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
-            </label>
+            <img id="cuebert-logo" src="../icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
+            <span class="file-inputs">
+              <label class="file-load-button">
+                <span>Load media</span>
+                <input class="visually-hidden-file" type="file" data-role="videoFile" accept="video/*,audio/*">
+              </label>
+              <label class="file-load-button">
+                <span>Load aTrain</span>
+                <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
+              </label>
+            </span><!-- .file-inputs -->
           </div>
           <video data-role="video" controls>
             <track
@@ -78,8 +83,9 @@ class SubtitleEditor extends HTMLElement {
                 Autosave
               </label>
               <button data-role="editSpeakersBtn" hidden>Edit speakers</button>
-              <button data-role="saveBtn" disabled>Save JSON</button>
-              Download: <button data-role="downloadTextBtn" disabled>TXT</button>
+              Export:
+              <button data-role="saveBtn" disabled>aTrain</button>
+              <button data-role="downloadTextBtn" disabled>TXT</button>
               <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
