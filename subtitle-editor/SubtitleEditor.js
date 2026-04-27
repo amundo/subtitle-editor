@@ -861,18 +861,6 @@ class SubtitleEditor extends HTMLElement {
     this.markDirty()
   }
 
-  mergeCueWithPrevious(cue) {
-    const index = this.cues.indexOf(cue)
-    if (index <= 0) return
-    this.mergeCues(this.cues[index - 1], cue)
-  }
-
-  mergeCueWithNext(cue) {
-    const index = this.cues.indexOf(cue)
-    if (index === -1 || index >= this.cues.length - 1) return
-    this.mergeCues(cue, this.cues[index + 1])
-  }
-
   mergeCues(targetCue, mergedCue) {
     const mergedIndex = this.cues.indexOf(mergedCue)
     if (mergedIndex === -1) return
@@ -1026,7 +1014,14 @@ class SubtitleEditor extends HTMLElement {
   renderCues() {
     this.cueList.innerHTML = ''
 
-    this.cues.forEach(cue => {
+    this.cues.forEach((cue, index) => {
+      if (index > 0) {
+        this.cueList.appendChild(this.createMergeCueRow(
+          this.cues[index - 1],
+          cue
+        ))
+      }
+
       const ce = document.createElement('cue-editor')
       ce.data = cue
       ce.video = this.video
@@ -1079,14 +1074,6 @@ class SubtitleEditor extends HTMLElement {
         this.splitCue(cue, selection)
       }
 
-      ce.onMergePrevious = () => {
-        this.mergeCueWithPrevious(cue)
-      }
-
-      ce.onMergeNext = () => {
-        this.mergeCueWithNext(cue)
-      }
-
       ce.onDeleteCue = () => {
         this.deleteCue(cue)
       }
@@ -1103,6 +1090,23 @@ class SubtitleEditor extends HTMLElement {
 
       this.cueList.appendChild(ce)
     })
+  }
+
+  createMergeCueRow(previousCue, nextCue) {
+    const row = document.createElement('div')
+    row.className = 'cue-merge-row'
+
+    const button = document.createElement('button')
+    button.type = 'button'
+    button.className = 'cue-merge-button'
+    button.textContent = 'Merge cues'
+    button.title = 'Merge the cue above with the cue below'
+    button.addEventListener('click', () => {
+      this.mergeCues(previousCue, nextCue)
+    })
+
+    row.appendChild(button)
+    return row
   }
 }
 

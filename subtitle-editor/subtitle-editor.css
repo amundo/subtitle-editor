@@ -222,4 +222,33 @@ subtitle-editor {
     border-radius: .25rem;
     background: #fafafa;
   }
+
+  .cue-merge-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0.65rem 0;
+  }
+
+  .cue-merge-row::before,
+  .cue-merge-row::after {
+    content: "";
+    flex: 1;
+    border-top: 1px solid #d8dee4;
+  }
+
+  .cue-merge-button {
+    margin: 0 0.75rem;
+    border: 1px solid #d0d7de;
+    border-radius: 999px;
+    background: #f6f8fa;
+    color: #24292f;
+    padding: 0.25rem 0.75rem;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+
+  .cue-merge-button:hover {
+    background: #eaeef2;
+  }
 }

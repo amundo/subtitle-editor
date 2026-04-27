@@ -21,8 +21,6 @@ class CueEditor extends HTMLElement {
     this.onExtendEndForward = null
     this.onSetSpeaker = null
     this.onSplitCue = null
-    this.onMergePrevious = null
-    this.onMergeNext = null
     this.onDeleteCue = null
   }
 
@@ -68,16 +66,8 @@ class CueEditor extends HTMLElement {
           <span class="cue-meta-spacer"></span>
 
           <button class="cue-action-button" data-role="splitCue" type="button"
-                  title="Split this cue at the playhead, or midpoint if the playhead is outside this cue">
-            Split
-          </button>
-          <button class="cue-action-button" data-role="mergePrevious" type="button"
-                  title="Merge this cue into the previous cue">
-            Merge ↑
-          </button>
-          <button class="cue-action-button" data-role="mergeNext" type="button"
-                  title="Merge the next cue into this cue">
-            Merge ↓
+                  title="Split this cue at the text cursor; timing splits at the playhead or midpoint">
+            Split at cursor
           </button>
           <button class="cue-action-button danger" data-role="deleteCue" type="button"
                   title="Delete this cue">
@@ -214,14 +204,6 @@ class CueEditor extends HTMLElement {
           selectionEnd: this.textarea.selectionEnd
         })
       }
-    })
-
-    this.querySelector('[data-role="mergePrevious"]')?.addEventListener('click', () => {
-      if (this.onMergePrevious) this.onMergePrevious()
-    })
-
-    this.querySelector('[data-role="mergeNext"]')?.addEventListener('click', () => {
-      if (this.onMergeNext) this.onMergeNext()
     })
 
     this.querySelector('[data-role="deleteCue"]')?.addEventListener('click', () => {
