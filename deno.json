@@ -1,0 +1,9 @@
+{
+  "tasks": {
+    "tauri": "deno run -A npm:@tauri-apps/cli@2",
+    "dev": "deno task tauri dev",
+    "build": "deno task tauri build",
+    "build-debug": "deno task tauri build --debug",
+    "icons": "bash scripts/update-icons.sh"
+  }
+}

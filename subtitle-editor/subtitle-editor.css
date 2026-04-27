@@ -1,5 +1,18 @@
-@import './colors.css';
 @import './cue-editor/cue-editor.css';
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: #f3f4f6;
+  color: #111827;
+  font-family: system-ui, sans-serif;
+}
+
+:where(a, button, input, textarea, select):focus-visible {
+  outline: 2px solid #6cb6ff;
+  outline-offset: 2px;
+}
 
 subtitle-editor {
   font-family: system-ui, sans-serif;
@@ -12,7 +25,7 @@ subtitle-editor {
   video {
     width: 100%;
     max-height: 60vh;
-    background: var(--foreground);
+    background: #202021;
   }
 
   .controls {
@@ -29,6 +42,131 @@ subtitle-editor {
     justify-content: space-between;
     align-items: center;
     margin-bottom: .5rem;
+  }
+
+  .cue-panel-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .cue-panel-actions button {
+    border: 1px solid #d0d7de;
+    background: #f6f8fa;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .autosave-status {
+    color: #57606a;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .autosave-status[data-state="dirty"] {
+    color: #9a6700;
+  }
+
+  .autosave-status[data-state="saving"] {
+    color: #0969da;
+  }
+
+  .autosave-status[data-state="saved"] {
+    color: #1a7f37;
+  }
+
+  .autosave-status[data-state="error"] {
+    color: #cf222e;
+  }
+
+  .autosave-toggle {
+    display: inline-flex;
+    gap: 0.35rem;
+    align-items: center;
+    color: #57606a;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+
+  .speaker-panel {
+    border: 1px solid #d8dee4;
+    border-radius: 0.35rem;
+    padding: 0.75rem;
+    background: #fff;
+  }
+
+  .speaker-dialog {
+    width: min(42rem, calc(100vw - 2rem));
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  .speaker-dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  .speaker-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.75rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .speaker-panel-hint {
+    color: #57606a;
+    font-size: 0.85rem;
+  }
+
+  .speaker-list {
+    display: grid;
+    gap: 0.5rem;
+  }
+
+  .speaker-add-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .speaker-row {
+    display: grid;
+    grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .speaker-source {
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #0b3a67;
+  }
+
+  .speaker-input {
+    min-width: 0;
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #d0d7de;
+    border-radius: 0.35rem;
+    font: inherit;
+  }
+
+  .speaker-apply {
+    border: 1px solid #d0d7de;
+    background: #f6f8fa;
+    padding: 0.4rem 0.7rem;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+
+  .speaker-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 0.75rem;
   }
 
   .cue-list {

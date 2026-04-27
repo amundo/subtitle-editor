@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Color Palette Viewer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="colors.css">
+</head>
+<body>
+  <main class="stack-md" style="padding: 1rem;">
+    <h1 style="font-size: 1.4rem; margin-bottom: 0.5rem;">
+      Color Palette Viewer
+    </h1>
+    <p class="text-muted" style="max-width: 40rem;">
+      All swatches below are rendered directly from the CSS variables in <code>colors.css</code>.
+      Change the variables, reload the page, and the viewer updates automatically.
+    </p>
+
+    <color-palette></color-palette>
+  </main>
+
+  <script type="module" src="ColorPalette.js"></script>
+</body>
+</html>

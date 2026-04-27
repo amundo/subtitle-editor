@@ -5,7 +5,20 @@ class SubtitleEditor extends HTMLElement {
   constructor() {
     super()
     this.cues = []
+    this.manualSpeakers = []
+    this.loadedTranscript = null
+    this.loadedTranscriptFormat = null
+    this.loadedTranscriptPath = null
     this.previewEnd = null
+    this.previewTrackUrl = null
+    this.autosaveEnabled = true
+    this.autosaveDelayMs = 1200
+    this.autosaveTimer = null
+    this.autosaveInFlight = false
+    this.autosaveQueued = false
+    this.hasUnsavedChanges = false
+    this.changeRevision = 0
+    this.lastAutosavedAt = null
 
     // audio analysis
     this.audioBuffer = null
@@ -28,20 +41,30 @@ class SubtitleEditor extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener('keydown', this._onKeyDown)
+    this.cancelScheduledAutosave()
+    this.revokePreviewTrackUrl()
   }
 
   renderShell() {
     this.innerHTML = `
         <div class="media-column">
           <div class="controls">
-            <label>Video:
-              <input type="file" data-role="videoFile" accept="video/*">
+            <label>Media:
+              <input type="file" data-role="videoFile" accept="video/*,audio/*">
             </label>
-            <label>Subtitles (.vtt):
-              <input type="file" data-role="vttFile" accept=".vtt">
+            <label>Subtitles / transcript (.vtt, .json):
+              <input type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
             </label>
           </div>
-          <video data-role="video" controls></video>
+          <video data-role="video" controls>
+            <track
+              data-role="previewTrack"
+              kind="subtitles"
+              srclang="en"
+              label="Edited subtitles"
+              default
+            >
+          </video>
           <div class="current-time-row">
             Current time:
             <span data-role="currentTime" class="time-label">00:00:00.000</span>
@@ -54,20 +77,64 @@ class SubtitleEditor extends HTMLElement {
         <div class="cues-column">
           <div class="cue-panel-header">
             <strong>Cues</strong>
-            <button data-role="downloadBtn" disabled>Download updated VTT</button>
+            <div class="cue-panel-actions">
+              <span data-role="autosaveStatus" class="autosave-status">Autosave ready</span>
+              <label class="autosave-toggle">
+                <input type="checkbox" data-role="autosaveToggle" checked>
+                Autosave
+              </label>
+              <button data-role="editSpeakersBtn" hidden>Edit speakers</button>
+              <button data-role="saveBtn" disabled>Save JSON</button>
+              <button data-role="downloadTextBtn" disabled>Download plain text</button>
+              <button data-role="downloadBtn" disabled>Download updated VTT</button>
+            </div>
           </div>
           <div data-role="cueList" class="cue-list"></div>
         </div>
+
+        <dialog data-role="speakerDialog" class="speaker-dialog">
+          <div class="speaker-panel">
+            <div class="speaker-panel-header">
+              <strong>Speakers</strong>
+              <span class="speaker-panel-hint">Rename a speaker once to update every cue.</span>
+            </div>
+            <form data-role="addSpeakerForm" class="speaker-add-row">
+              <input
+                data-role="addSpeakerInput"
+                class="speaker-input"
+                type="text"
+                placeholder="New speaker name"
+                aria-label="New speaker name"
+              >
+              <button data-role="addSpeakerBtn" class="speaker-apply" type="submit">Add speaker</button>
+            </form>
+            <div data-role="speakerList" class="speaker-list"></div>
+            <div class="speaker-dialog-actions">
+              <button data-role="closeSpeakerDialogBtn" type="button">Close</button>
+            </div>
+          </div>
+        </dialog>
     `
   }
 
   cacheElements() {
     this.video = this.querySelector('[data-role="video"]')
+    this.previewTrack = this.querySelector('[data-role="previewTrack"]')
     this.currentTimeLabel = this.querySelector('[data-role="currentTime"]')
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
+    this.saveBtn = this.querySelector('[data-role="saveBtn"]')
     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
+    this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
+    this.autosaveStatus = this.querySelector('[data-role="autosaveStatus"]')
+    this.autosaveToggle = this.querySelector('[data-role="autosaveToggle"]')
+    this.editSpeakersBtn = this.querySelector('[data-role="editSpeakersBtn"]')
+    this.speakerDialog = this.querySelector('[data-role="speakerDialog"]')
+    this.closeSpeakerDialogBtn = this.querySelector('[data-role="closeSpeakerDialogBtn"]')
+    this.addSpeakerForm = this.querySelector('[data-role="addSpeakerForm"]')
+    this.addSpeakerInput = this.querySelector('[data-role="addSpeakerInput"]')
+    this.speakerList = this.querySelector('[data-role="speakerList"]')
   }
 
   bindEvents() {
@@ -83,37 +150,111 @@ class SubtitleEditor extends HTMLElement {
       const file = e.target.files[0]
       if (!file) return
       this.video.src = URL.createObjectURL(file)
+      this.ensurePreviewTrackShowing()
       // kick off async audio analysis
       this.initAudioAnalysis(file).catch(err => {
         console.error('Audio analysis failed:', err)
       })
     })
-
     this.vttFileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       file.text().then(text => {
-        this.cues = this.parseVtt(text)
+        const parsed = this.parseSubtitleFile(text, file.name)
+        this.cues = parsed.cues
+        this.loadedTranscript = parsed.sourceData
+        this.loadedTranscriptFormat = parsed.format
+        this.loadedTranscriptPath = this.getFilePath(file)
+        this.manualSpeakers = []
+        this.hasUnsavedChanges = false
+        this.changeRevision = 0
+        this.lastAutosavedAt = null
+        this.renderSpeakerEditor()
         this.renderCues()
+        this.refreshPreviewTrack()
+        this.saveBtn.disabled = parsed.format !== 'atrain-json'
         this.downloadBtn.disabled = false
+        this.downloadTextBtn.disabled = false
+        this.updateAutosaveStatus()
+      }).catch(err => {
+        console.error('Subtitle parsing failed:', err)
+        alert(
+          'Could not parse that subtitle file. This editor currently supports WebVTT and the aTrain/Whisper-style JSON sample format.'
+        )
       })
     })
 
     this.downloadBtn.addEventListener('click', () => {
-      const vtt = this.buildVtt(this.cues)
-      const blob = new Blob([vtt], { type: 'text/vtt' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = 'adjusted-subtitles.vtt'
-      a.click()
-      URL.revokeObjectURL(url)
+      this.saveTextOutput({
+        defaultPath: 'adjusted-subtitles.vtt',
+        filters: [{ name: 'WebVTT', extensions: ['vtt'] }],
+        contents: this.buildVtt(this.cues),
+        mimeType: 'text/vtt'
+      }).then(targetPath => {
+        if (targetPath && this.loadedTranscriptFormat === 'vtt') {
+          this.markSavedToPath(targetPath)
+        }
+      })
+    })
+
+    this.saveBtn.addEventListener('click', () => {
+      if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
+
+      const json = this.buildAtrainJson(this.cues, this.loadedTranscript)
+      this.saveTextOutput({
+        defaultPath: 'transcription-edited.json',
+        filters: [{ name: 'JSON', extensions: ['json'] }],
+        contents: JSON.stringify(json, null, 2),
+        mimeType: 'application/json'
+      }).then(targetPath => {
+        if (targetPath) {
+          this.markSavedToPath(targetPath)
+        }
+      })
+    })
+
+    this.downloadTextBtn.addEventListener('click', () => {
+      this.saveTextOutput({
+        defaultPath: 'transcript.txt',
+        filters: [{ name: 'Text', extensions: ['txt'] }],
+        contents: this.buildPlainText(this.cues),
+        mimeType: 'text/plain'
+      })
+    })
+
+    this.editSpeakersBtn.addEventListener('click', () => {
+      if (this.speakerDialog) this.speakerDialog.showModal()
+    })
+
+    this.closeSpeakerDialogBtn.addEventListener('click', () => {
+      if (this.speakerDialog?.open) this.speakerDialog.close()
+    })
+
+    this.addSpeakerForm.addEventListener('submit', e => {
+      e.preventDefault()
+      this.addSpeaker(this.addSpeakerInput?.value ?? '')
+    })
+
+    this.autosaveToggle?.addEventListener('change', () => {
+      this.autosaveEnabled = this.autosaveToggle.checked
+      if (!this.autosaveEnabled) {
+        this.cancelScheduledAutosave()
+      } else if (this.hasUnsavedChanges) {
+        this.scheduleAutosave()
+      }
+      this.updateAutosaveStatus()
+    })
+
+    this.previewTrack?.addEventListener('load', () => {
+      this.ensurePreviewTrackShowing()
     })
 
     window.addEventListener('keydown', this._onKeyDown)
   }
 
   _onKeyDown(e) {
+    if (this.speakerDialog?.open) return
+
     if (e.key === 'Escape') {
       if (this.video.paused) this.video.play()
       else this.video.pause()
@@ -129,6 +270,7 @@ class SubtitleEditor extends HTMLElement {
         this.activeCue.start = this.activeCue.end
       }
       this.renderCues()
+      this.markDirty()
     } else if (e.key === ']') {
       // set end to current time
       this.activeCue.end = this.video.currentTime
@@ -136,6 +278,7 @@ class SubtitleEditor extends HTMLElement {
         this.activeCue.end = this.activeCue.start
       }
       this.renderCues()
+      this.markDirty()
     }
   }
 
@@ -236,6 +379,79 @@ class SubtitleEditor extends HTMLElement {
 
   // ---------- VTT parsing/building ----------
 
+  parseSubtitleFile(text, fileName = '') {
+    const trimmed = text.trimStart()
+    const looksLikeJson =
+      fileName.toLowerCase().endsWith('.json') ||
+      trimmed.startsWith('{') ||
+      trimmed.startsWith('[')
+
+    if (looksLikeJson) {
+      try {
+        return this.parseAtrainJson(text)
+      } catch (err) {
+        if (!trimmed.startsWith('WEBVTT')) throw err
+      }
+    }
+
+    return {
+      format: 'vtt',
+      cues: this.parseVtt(text),
+      sourceData: null
+    }
+  }
+
+  parseAtrainJson(text) {
+    const parsed = JSON.parse(text)
+    const segments = Array.isArray(parsed) ? parsed : parsed?.segments
+
+    if (!Array.isArray(segments)) {
+      throw new Error('Expected a JSON array or an object with segments[]')
+    }
+
+    const cues = segments
+      .filter(segment => this.isFiniteNumber(segment?.start) && this.isFiniteNumber(segment?.end))
+      .map((segment, index) => {
+        const rawText = typeof segment.text === 'string' ? segment.text : ''
+        const speaker = this.getSegmentSpeaker(segment)
+        return {
+          id: segment.id ?? index + 1,
+          start: Number(segment.start),
+          end: Number(segment.end),
+          text: rawText.trim(),
+          speaker,
+          sourceSegmentId: segment.id ?? index + 1
+        }
+      })
+
+    return {
+      format: 'atrain-json',
+      cues,
+      sourceData: parsed
+    }
+  }
+
+  getSegmentSpeaker(segment) {
+    if (typeof segment?.speaker === 'string' && segment.speaker.trim()) {
+      return segment.speaker.trim()
+    }
+
+    if (Array.isArray(segment?.words)) {
+      const firstWordSpeaker = segment.words.find(word =>
+        typeof word?.speaker === 'string' && word.speaker.trim()
+      )
+      if (firstWordSpeaker) {
+        return firstWordSpeaker.speaker.trim()
+      }
+    }
+
+    return null
+  }
+
+  isFiniteNumber(value) {
+    return typeof value === 'number' && Number.isFinite(value)
+  }
+
   parseVtt(text) {
     const lines = text.replace(/\r/g, '').split('\n')
     const cues = []
@@ -276,10 +492,293 @@ class SubtitleEditor extends HTMLElement {
       parts.push(
         `${this.formatTime(cue.start)} --> ${this.formatTime(cue.end)}`
       )
-      parts.push(cue.text || '')
+      parts.push(this.formatCueTextForExport(cue))
       parts.push('')
     }
     return parts.join('\n')
+  }
+
+  buildPlainText(cues) {
+    const parts = []
+    let previousSpeaker = null
+
+    cues.forEach(cue => {
+      const text = (cue.text || '').trim()
+      if (!text) return
+
+      const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
+      const speakerChanged = speaker && speaker !== previousSpeaker
+      const line = speakerChanged ? `[${speaker}] ${text}` : text
+
+      parts.push(line)
+      parts.push('')
+      previousSpeaker = speaker
+    })
+
+    while (parts.length && parts.at(-1) === '') {
+      parts.pop()
+    }
+
+    return parts.join('\n')
+  }
+
+  formatCueTextForExport(cue) {
+    const text = (cue.text || '').trim()
+    const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
+    if (!speaker || !text) return text
+
+    const speakerPrefix = `[${speaker}] `
+    return text.startsWith(speakerPrefix) ? text : `${speakerPrefix}${text}`
+  }
+
+  buildAtrainJson(cues, sourceData) {
+    const cloned = structuredClone(sourceData)
+    const segments = Array.isArray(cloned) ? cloned : cloned?.segments
+    if (!Array.isArray(segments)) return cloned
+
+    const cueBySegmentId = new Map(
+      cues.map(cue => [cue.sourceSegmentId ?? cue.id, cue])
+    )
+
+    segments.forEach((segment, index) => {
+      const cue = cueBySegmentId.get(segment.id ?? index + 1)
+      if (!cue) return
+
+      const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
+      const text = (cue.text || '').trim()
+
+      if (speaker) segment.speaker = speaker
+      else delete segment.speaker
+
+      segment.text = text ? ` ${text}` : ''
+
+      if (Array.isArray(segment.words)) {
+        segment.words = segment.words.map(word => {
+          const nextWord = { ...word }
+          if (speaker) nextWord.speaker = speaker
+          else delete nextWord.speaker
+          return nextWord
+        })
+      }
+    })
+
+    return cloned
+  }
+
+  refreshPreviewTrack() {
+    if (!this.previewTrack) return
+
+    const vtt = this.buildVtt(this.cues)
+    const nextUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
+    const previousUrl = this.previewTrackUrl
+
+    this.previewTrackUrl = nextUrl
+    this.previewTrack.src = nextUrl
+    this.ensurePreviewTrackShowing()
+
+    if (previousUrl) {
+      URL.revokeObjectURL(previousUrl)
+    }
+  }
+
+  markDirty() {
+    if (!this.cues.length) return
+    this.hasUnsavedChanges = true
+    this.changeRevision++
+    this.refreshPreviewTrack()
+    this.scheduleAutosave()
+    this.updateAutosaveStatus()
+  }
+
+  scheduleAutosave() {
+    this.cancelScheduledAutosave()
+
+    if (!this.autosaveEnabled || !this.canAutosave()) return
+
+    this.autosaveTimer = window.setTimeout(() => {
+      this.autosaveTimer = null
+      this.autosave().catch(error => {
+        console.error('Autosave failed:', error)
+        this.updateAutosaveStatus(`Autosave failed: ${error?.message ?? error}`)
+      })
+    }, this.autosaveDelayMs)
+  }
+
+  cancelScheduledAutosave() {
+    if (this.autosaveTimer) {
+      window.clearTimeout(this.autosaveTimer)
+      this.autosaveTimer = null
+    }
+  }
+
+  canAutosave() {
+    return Boolean(
+      this.loadedTranscriptPath &&
+      window.__TAURI__?.fs?.writeTextFile &&
+      ['atrain-json', 'vtt'].includes(this.loadedTranscriptFormat)
+    )
+  }
+
+  async autosave() {
+    if (!this.hasUnsavedChanges || !this.autosaveEnabled || !this.canAutosave()) {
+      this.updateAutosaveStatus()
+      return
+    }
+
+    if (this.autosaveInFlight) {
+      this.autosaveQueued = true
+      return
+    }
+
+    this.autosaveInFlight = true
+    this.updateAutosaveStatus('Autosaving...')
+
+    try {
+      const revision = this.changeRevision
+      const contents = this.buildLoadedTranscriptContents()
+      await window.__TAURI__.fs.writeTextFile(this.loadedTranscriptPath, contents)
+      if (revision === this.changeRevision) {
+        this.hasUnsavedChanges = false
+      } else {
+        this.hasUnsavedChanges = true
+        this.autosaveQueued = true
+      }
+      this.lastAutosavedAt = new Date()
+      this.updateAutosaveStatus()
+    } finally {
+      this.autosaveInFlight = false
+    }
+
+    if (this.autosaveQueued) {
+      this.autosaveQueued = false
+      this.scheduleAutosave()
+    }
+  }
+
+  buildLoadedTranscriptContents() {
+    if (this.loadedTranscriptFormat === 'atrain-json') {
+      const json = this.buildAtrainJson(this.cues, this.loadedTranscript)
+      return `${JSON.stringify(json, null, 2)}\n`
+    }
+
+    if (this.loadedTranscriptFormat === 'vtt') {
+      return this.buildVtt(this.cues)
+    }
+
+    throw new Error(`Autosave is not available for ${this.loadedTranscriptFormat}`)
+  }
+
+  updateAutosaveStatus(message = null) {
+    if (!this.autosaveStatus) return
+
+    if (message) {
+      this.autosaveStatus.textContent = message
+      this.autosaveStatus.dataset.state = message.toLowerCase().includes('fail')
+        ? 'error'
+        : 'saving'
+      return
+    }
+
+    if (!this.cues.length) {
+      this.autosaveStatus.textContent = 'Autosave ready'
+      this.autosaveStatus.dataset.state = 'idle'
+      return
+    }
+
+    if (!this.autosaveEnabled) {
+      this.autosaveStatus.textContent = this.hasUnsavedChanges
+        ? 'Unsaved changes'
+        : 'Autosave off'
+      this.autosaveStatus.dataset.state = this.hasUnsavedChanges ? 'dirty' : 'idle'
+      return
+    }
+
+    if (!this.canAutosave()) {
+      this.autosaveStatus.textContent = window.__TAURI__?.fs?.writeTextFile
+        ? 'Autosave unavailable'
+        : 'Autosave desktop only'
+      this.autosaveStatus.dataset.state = 'idle'
+      return
+    }
+
+    if (this.autosaveTimer) {
+      this.autosaveStatus.textContent = 'Autosave pending'
+      this.autosaveStatus.dataset.state = 'dirty'
+      return
+    }
+
+    if (this.hasUnsavedChanges) {
+      this.autosaveStatus.textContent = 'Unsaved changes'
+      this.autosaveStatus.dataset.state = 'dirty'
+      return
+    }
+
+    this.autosaveStatus.textContent = this.lastAutosavedAt
+      ? `Saved ${this.lastAutosavedAt.toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+          second: '2-digit'
+        })}`
+      : 'Autosave ready'
+    this.autosaveStatus.dataset.state = 'saved'
+  }
+
+  getFilePath(file) {
+    return file?.path || file?.webkitRelativePath || null
+  }
+
+  markSavedToPath(targetPath) {
+    this.loadedTranscriptPath = targetPath
+    this.hasUnsavedChanges = false
+    this.changeRevision = 0
+    this.lastAutosavedAt = new Date()
+    this.updateAutosaveStatus()
+  }
+
+  ensurePreviewTrackShowing() {
+    const previewTextTrack = this.video?.textTracks?.[0]
+    if (previewTextTrack) {
+      previewTextTrack.mode = 'showing'
+    }
+  }
+
+  revokePreviewTrackUrl() {
+    if (this.previewTrackUrl) {
+      URL.revokeObjectURL(this.previewTrackUrl)
+      this.previewTrackUrl = null
+    }
+  }
+
+  async saveTextOutput({ defaultPath, filters, contents, mimeType }) {
+    try {
+      const tauriDialog = window.__TAURI__?.dialog
+      const tauriFs = window.__TAURI__?.fs
+
+      if (tauriDialog?.save && tauriFs?.writeTextFile) {
+        const targetPath = await tauriDialog.save({
+          defaultPath,
+          filters
+        })
+
+        if (!targetPath) return
+
+        await tauriFs.writeTextFile(targetPath, contents)
+        console.info(`Saved file to ${targetPath}`)
+        return targetPath
+      }
+
+      const blob = new Blob([contents], { type: mimeType })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = defaultPath
+      a.click()
+      URL.revokeObjectURL(url)
+      return null
+    } catch (error) {
+      console.error('Saving file failed:', error)
+      alert(`Saving file failed: ${error?.message ?? error}`)
+    }
   }
 
   // ---------- cue rendering ----------
@@ -293,6 +792,97 @@ class SubtitleEditor extends HTMLElement {
     if (element) element.classList.add('is-active')
   }
 
+  getUniqueSpeakers() {
+    return [...new Set(
+      [...this.manualSpeakers, ...this.cues
+        .map(cue => (typeof cue.speaker === 'string' ? cue.speaker.trim() : ''))
+        .filter(Boolean)]
+    )]
+  }
+
+  renameSpeaker(fromSpeaker, toSpeaker) {
+    const from = typeof fromSpeaker === 'string' ? fromSpeaker.trim() : ''
+    const to = typeof toSpeaker === 'string' ? toSpeaker.trim() : ''
+    if (!from || !to || from === to) return
+
+    this.manualSpeakers = this.manualSpeakers.map(speaker =>
+      speaker === from ? to : speaker
+    )
+    this.manualSpeakers = [...new Set(this.manualSpeakers)]
+
+    this.cues.forEach(cue => {
+      if (cue.speaker === from) {
+        cue.speaker = to
+      }
+    })
+
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.markDirty()
+  }
+
+  setCueSpeaker(cue, speaker) {
+    const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
+    cue.speaker = nextSpeaker || null
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.markDirty()
+  }
+
+  addSpeaker(speaker) {
+    const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
+    if (!nextSpeaker) return
+
+    if (!this.getUniqueSpeakers().includes(nextSpeaker)) {
+      this.manualSpeakers.push(nextSpeaker)
+    }
+
+    if (this.addSpeakerInput) this.addSpeakerInput.value = ''
+    this.renderSpeakerEditor()
+    this.renderCues()
+  }
+
+  renderSpeakerEditor() {
+    if (!this.editSpeakersBtn || !this.speakerList) return
+
+    const speakers = this.getUniqueSpeakers()
+    this.editSpeakersBtn.hidden = this.cues.length === 0
+    if (!speakers.length) {
+      this.speakerList.innerHTML = ''
+      return
+    }
+
+    this.speakerList.innerHTML = ''
+
+    speakers.forEach(speaker => {
+      const row = document.createElement('form')
+      row.className = 'speaker-row'
+      const source = document.createElement('span')
+      source.className = 'speaker-source'
+      source.textContent = speaker
+
+      const input = document.createElement('input')
+      input.className = 'speaker-input'
+      input.type = 'text'
+      input.value = speaker
+      input.setAttribute('aria-label', `Rename ${speaker}`)
+
+      const button = document.createElement('button')
+      button.type = 'submit'
+      button.className = 'speaker-apply'
+      button.textContent = 'Apply'
+
+      row.append(source, input, button)
+
+      row.addEventListener('submit', e => {
+        e.preventDefault()
+        this.renameSpeaker(speaker, input?.value ?? '')
+      })
+
+      this.speakerList.appendChild(row)
+    })
+  }
+
   renderCues() {
     this.cueList.innerHTML = ''
 
@@ -301,6 +891,7 @@ class SubtitleEditor extends HTMLElement {
       ce.data = cue
       ce.video = this.video
       ce.formatTime = this.formatTime.bind(this)
+      ce.speakerOptions = this.getUniqueSpeakers()
 
       // waveform props (will be null until analysis is ready)
       ce.envelope = this.envelope
@@ -318,22 +909,30 @@ class SubtitleEditor extends HTMLElement {
         cue.start = this.video.currentTime
         if (cue.start > cue.end) cue.start = cue.end
         this.renderCues()
+        this.markDirty()
       }
 
       ce.onSnapEndToNow = () => {
         cue.end = this.video.currentTime
         if (cue.end < cue.start) cue.end = cue.start
         this.renderCues()
+        this.markDirty()
       }
 
       ce.onExtendStartBackward = () => {
         cue.start = this.findPrevValleyTime(cue.start)
         this.renderCues()
+        this.markDirty()
       }
 
       ce.onExtendEndForward = () => {
         cue.end = this.findNextValleyTime(cue.end)
         this.renderCues()
+        this.markDirty()
+      }
+
+      ce.onSetSpeaker = nextSpeaker => {
+        this.setCueSpeaker(cue, nextSpeaker)
       }
 
       ce.addEventListener('focusin', () => {
@@ -341,6 +940,9 @@ class SubtitleEditor extends HTMLElement {
       })
       ce.addEventListener('click', () => {
         this.setActiveCue(cue, ce)
+      })
+      ce.addEventListener('cuechange', () => {
+        this.markDirty()
       })
 
       this.cueList.appendChild(ce)

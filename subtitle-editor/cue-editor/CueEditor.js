@@ -6,6 +6,7 @@ class CueEditor extends HTMLElement {
     this.#data = null
     this.video = null
     this.formatTime = seconds => seconds.toFixed(3)
+    this.speakerOptions = []
 
     // waveform props
     this.envelope = null
@@ -18,6 +19,7 @@ class CueEditor extends HTMLElement {
     this.onSnapEndToNow = null
     this.onExtendStartBackward = null
     this.onExtendEndForward = null
+    this.onSetSpeaker = null
   }
 
   connectedCallback() {
@@ -39,12 +41,25 @@ class CueEditor extends HTMLElement {
       return
     }
 
-    const { start, end, text } = this.#data
+    const { text, speaker } = this.#data
+    const speakerLabelMarkup = speaker
+      ? this.escapeHtml(speaker)
+      : 'No speaker'
+    const speakerClassName = speaker
+      ? 'speaker-pill'
+      : 'speaker-pill is-empty'
 
     this.innerHTML = `
         <div class="cue-waveform-wrapper">
           <svg class="cue-waveform" viewBox="0 0 100 40" preserveAspectRatio="none"
                data-role="waveform"></svg>
+        </div>
+
+        <div class="cue-meta-row">
+          <button class="${speakerClassName}" data-role="speakerPill" type="button"
+                  title="Cycle to the next speaker">
+            ${speakerLabelMarkup}
+          </button>
         </div>
 
         <div class="cue-time-row">
@@ -107,11 +122,10 @@ class CueEditor extends HTMLElement {
     this.startLabel = this.querySelector('[data-role="startLabel"]')
     this.endLabel = this.querySelector('[data-role="endLabel"]')
     this.textarea = this.querySelector('[data-role="text"]')
+    this.speakerPill = this.querySelector('[data-role="speakerPill"]')
   }
 
   bindEvents() {
-    const { start, end } = this.#data
-
     this.querySelector('[data-role="jumpStart"]').addEventListener('click', () => {
       if (!this.video) return
       this.video.currentTime = this.#data.start
@@ -161,7 +175,14 @@ class CueEditor extends HTMLElement {
 
     this.textarea.addEventListener('input', () => {
       this.#data.text = this.textarea.value
+      this.dispatchEvent(new CustomEvent('cuechange'))
     })
+
+    if (this.speakerPill) {
+      this.speakerPill.addEventListener('click', () => {
+        if (this.onSetSpeaker) this.onSetSpeaker(this.getNextSpeaker())
+      })
+    }
   }
 
   updateTimeLabels() {
@@ -248,6 +269,33 @@ class CueEditor extends HTMLElement {
       <path class="wf-current" d="${currPath}"></path>
       <path class="wf-next" d="${nextPath}"></path>
     `
+  }
+
+  getNextSpeaker() {
+    const currentSpeaker =
+      typeof this.#data?.speaker === 'string' ? this.#data.speaker.trim() : ''
+    const options = [...new Set(this.speakerOptions.filter(Boolean))]
+    const cycle = currentSpeaker && !options.includes(currentSpeaker)
+      ? [currentSpeaker, ...options]
+      : options
+
+    if (!cycle.length) return ''
+
+    const currentIndex = cycle.indexOf(currentSpeaker)
+    if (currentIndex === -1) {
+      return cycle[0]
+    }
+
+    return cycle[(currentIndex + 1) % cycle.length]
+  }
+
+  escapeHtml(value) {
+    return String(value)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;')
   }
 }
 
