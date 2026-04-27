@@ -23,6 +23,10 @@ cue-editor {
     margin-bottom: 0.45rem;
   }
 
+  .cue-meta-spacer {
+    flex: 1;
+  }
+
   .speaker-pill {
     display: inline-block;
     padding: 0.15rem 0.55rem;
@@ -40,6 +44,31 @@ cue-editor {
   .speaker-pill.is-empty {
     background: #f6f8fa;
     color: #57606a;
+  }
+
+  .cue-action-button {
+    border: 1px solid #d0d7de;
+    background: #f6f8fa;
+    color: #24292f;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    white-space: nowrap;
+
+    &:hover {
+      background: #eaeef2;
+    }
+  }
+
+  .cue-action-button.danger {
+    border-color: #ffebe9;
+    background: #fff8f7;
+    color: #cf222e;
+
+    &:hover {
+      background: #ffebe9;
+    }
   }
 
   .cue-waveform {

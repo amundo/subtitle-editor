@@ -20,6 +20,10 @@ class CueEditor extends HTMLElement {
     this.onExtendStartBackward = null
     this.onExtendEndForward = null
     this.onSetSpeaker = null
+    this.onSplitCue = null
+    this.onMergePrevious = null
+    this.onMergeNext = null
+    this.onDeleteCue = null
   }
 
   connectedCallback() {
@@ -59,6 +63,25 @@ class CueEditor extends HTMLElement {
           <button class="${speakerClassName}" data-role="speakerPill" type="button"
                   title="Cycle to the next speaker">
             ${speakerLabelMarkup}
+          </button>
+
+          <span class="cue-meta-spacer"></span>
+
+          <button class="cue-action-button" data-role="splitCue" type="button"
+                  title="Split this cue at the playhead, or midpoint if the playhead is outside this cue">
+            Split
+          </button>
+          <button class="cue-action-button" data-role="mergePrevious" type="button"
+                  title="Merge this cue into the previous cue">
+            Merge ↑
+          </button>
+          <button class="cue-action-button" data-role="mergeNext" type="button"
+                  title="Merge the next cue into this cue">
+            Merge ↓
+          </button>
+          <button class="cue-action-button danger" data-role="deleteCue" type="button"
+                  title="Delete this cue">
+            Delete
           </button>
         </div>
 
@@ -183,6 +206,27 @@ class CueEditor extends HTMLElement {
         if (this.onSetSpeaker) this.onSetSpeaker(this.getNextSpeaker())
       })
     }
+
+    this.querySelector('[data-role="splitCue"]')?.addEventListener('click', () => {
+      if (this.onSplitCue) {
+        this.onSplitCue({
+          selectionStart: this.textarea.selectionStart,
+          selectionEnd: this.textarea.selectionEnd
+        })
+      }
+    })
+
+    this.querySelector('[data-role="mergePrevious"]')?.addEventListener('click', () => {
+      if (this.onMergePrevious) this.onMergePrevious()
+    })
+
+    this.querySelector('[data-role="mergeNext"]')?.addEventListener('click', () => {
+      if (this.onMergeNext) this.onMergeNext()
+    })
+
+    this.querySelector('[data-role="deleteCue"]')?.addEventListener('click', () => {
+      if (this.onDeleteCue) this.onDeleteCue()
+    })
   }
 
   updateTimeLabels() {

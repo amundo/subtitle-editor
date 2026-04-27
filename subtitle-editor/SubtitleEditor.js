@@ -26,11 +26,9 @@ class SubtitleEditor extends HTMLElement {
     this.frameDuration = null
     this.valleys = null
 
-    // active cue for keyboard shortcuts
+    // active cue for focused editor state
     this.activeCue = null
     this.activeCueElement = null
-
-    this._onKeyDown = this._onKeyDown.bind(this)
   }
 
   connectedCallback() {
@@ -40,7 +38,6 @@ class SubtitleEditor extends HTMLElement {
   }
 
   disconnectedCallback() {
-    window.removeEventListener('keydown', this._onKeyDown)
     this.cancelScheduledAutosave()
     this.revokePreviewTrackUrl()
   }
@@ -52,7 +49,7 @@ class SubtitleEditor extends HTMLElement {
             <label>Media:
               <input type="file" data-role="videoFile" accept="video/*,audio/*">
             </label>
-            <label>Subtitles / transcript (.vtt, .json):
+            <label>aTrain JSON:
               <input type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
             </label>
           </div>
@@ -69,9 +66,6 @@ class SubtitleEditor extends HTMLElement {
             Current time:
             <span data-role="currentTime" class="time-label">00:00:00.000</span>
           </div>
-          <p class="hint">
-            Esc: play/pause · [ set start to current time · ] set end to current time
-          </p>
         </div>
 
         <div class="cues-column">
@@ -85,8 +79,8 @@ class SubtitleEditor extends HTMLElement {
               </label>
               <button data-role="editSpeakersBtn" hidden>Edit speakers</button>
               <button data-role="saveBtn" disabled>Save JSON</button>
-              <button data-role="downloadTextBtn" disabled>Download plain text</button>
-              <button data-role="downloadBtn" disabled>Download updated VTT</button>
+              Download: <button data-role="downloadTextBtn" disabled>TXT</button>
+              <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
           <div data-role="cueList" class="cue-list"></div>
@@ -249,37 +243,6 @@ class SubtitleEditor extends HTMLElement {
       this.ensurePreviewTrackShowing()
     })
 
-    window.addEventListener('keydown', this._onKeyDown)
-  }
-
-  _onKeyDown(e) {
-    if (this.speakerDialog?.open) return
-
-    if (e.key === 'Escape') {
-      if (this.video.paused) this.video.play()
-      else this.video.pause()
-      return
-    }
-
-    if (!this.activeCue) return
-
-    if (e.key === '[') {
-      // set start to current time
-      this.activeCue.start = this.video.currentTime
-      if (this.activeCue.start > this.activeCue.end) {
-        this.activeCue.start = this.activeCue.end
-      }
-      this.renderCues()
-      this.markDirty()
-    } else if (e.key === ']') {
-      // set end to current time
-      this.activeCue.end = this.video.currentTime
-      if (this.activeCue.end < this.activeCue.start) {
-        this.activeCue.end = this.activeCue.start
-      }
-      this.renderCues()
-      this.markDirty()
-    }
   }
 
   // ---------- audio analysis ----------
@@ -420,7 +383,8 @@ class SubtitleEditor extends HTMLElement {
           end: Number(segment.end),
           text: rawText.trim(),
           speaker,
-          sourceSegmentId: segment.id ?? index + 1
+          sourceSegmentId: segment.id ?? index + 1,
+          sourceSegmentIds: [segment.id ?? index + 1]
         }
       })
 
@@ -536,16 +500,21 @@ class SubtitleEditor extends HTMLElement {
     const segments = Array.isArray(cloned) ? cloned : cloned?.segments
     if (!Array.isArray(segments)) return cloned
 
-    const cueBySegmentId = new Map(
-      cues.map(cue => [cue.sourceSegmentId ?? cue.id, cue])
+    const sourceSegmentById = new Map(
+      segments.map((segment, index) => [segment.id ?? index + 1, segment])
     )
 
-    segments.forEach((segment, index) => {
-      const cue = cueBySegmentId.get(segment.id ?? index + 1)
-      if (!cue) return
-
+    const nextSegments = cues.map((cue, index) => {
+      const sourceSegmentIds = this.getCueSourceSegmentIds(cue)
+      const segment = structuredClone(
+        sourceSegmentById.get(sourceSegmentIds[0] ?? cue.id) ?? {}
+      )
       const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
       const text = (cue.text || '').trim()
+
+      segment.id = index + 1
+      segment.start = cue.start
+      segment.end = cue.end
 
       if (speaker) segment.speaker = speaker
       else delete segment.speaker
@@ -553,16 +522,43 @@ class SubtitleEditor extends HTMLElement {
       segment.text = text ? ` ${text}` : ''
 
       if (Array.isArray(segment.words)) {
-        segment.words = segment.words.map(word => {
-          const nextWord = { ...word }
-          if (speaker) nextWord.speaker = speaker
-          else delete nextWord.speaker
-          return nextWord
-        })
+        const sourceWords = sourceSegmentIds
+          .flatMap(sourceSegmentId =>
+            sourceSegmentById.get(sourceSegmentId)?.words ?? []
+          )
+
+        segment.words = sourceWords
+          .filter(word =>
+            this.isFiniteNumber(word?.start) &&
+            this.isFiniteNumber(word?.end) &&
+            word.start >= cue.start &&
+            word.end <= cue.end
+          )
+          .map(word => {
+            const nextWord = { ...word }
+            if (speaker) nextWord.speaker = speaker
+            else delete nextWord.speaker
+            return nextWord
+          })
       }
+
+      return segment
     })
 
+    if (Array.isArray(cloned)) {
+      return nextSegments
+    }
+
+    cloned.segments = nextSegments
     return cloned
+  }
+
+  getCueSourceSegmentIds(cue) {
+    if (Array.isArray(cue.sourceSegmentIds) && cue.sourceSegmentIds.length) {
+      return cue.sourceSegmentIds
+    }
+
+    return [cue.sourceSegmentId ?? cue.id]
   }
 
   refreshPreviewTrack() {
@@ -582,7 +578,6 @@ class SubtitleEditor extends HTMLElement {
   }
 
   markDirty() {
-    if (!this.cues.length) return
     this.hasUnsavedChanges = true
     this.changeRevision++
     this.refreshPreviewTrack()
@@ -829,6 +824,145 @@ class SubtitleEditor extends HTMLElement {
     this.markDirty()
   }
 
+  splitCue(cue, selection = {}) {
+    const index = this.cues.indexOf(cue)
+    if (index === -1) return
+
+    const splitTime = this.getCueSplitTime(cue)
+    if (splitTime <= cue.start || splitTime >= cue.end) return
+
+    const [beforeText, afterText] = this.splitCueText(
+      cue.text || '',
+      selection.selectionStart
+    )
+    const nextCue = {
+      ...cue,
+      id: this.createCueId(cue.id, 'b'),
+      start: splitTime,
+      end: cue.end,
+      text: afterText,
+      sourceSegmentIds: this.getCueSourceSegmentIds(cue)
+    }
+
+    cue.id = this.createCueId(cue.id, 'a')
+    cue.end = splitTime
+    cue.text = beforeText
+    cue.sourceSegmentIds = this.getCueSourceSegmentIds(cue)
+
+    this.cues.splice(index + 1, 0, nextCue)
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.markDirty()
+  }
+
+  mergeCueWithPrevious(cue) {
+    const index = this.cues.indexOf(cue)
+    if (index <= 0) return
+    this.mergeCues(this.cues[index - 1], cue)
+  }
+
+  mergeCueWithNext(cue) {
+    const index = this.cues.indexOf(cue)
+    if (index === -1 || index >= this.cues.length - 1) return
+    this.mergeCues(cue, this.cues[index + 1])
+  }
+
+  mergeCues(targetCue, mergedCue) {
+    const mergedIndex = this.cues.indexOf(mergedCue)
+    if (mergedIndex === -1) return
+
+    targetCue.start = Math.min(targetCue.start, mergedCue.start)
+    targetCue.end = Math.max(targetCue.end, mergedCue.end)
+    targetCue.text = this.joinCueText(targetCue.text, mergedCue.text)
+    targetCue.sourceSegmentIds = [
+      ...new Set([
+        ...this.getCueSourceSegmentIds(targetCue),
+        ...this.getCueSourceSegmentIds(mergedCue)
+      ])
+    ]
+    if (!targetCue.speaker && mergedCue.speaker) {
+      targetCue.speaker = mergedCue.speaker
+    }
+
+    this.cues.splice(mergedIndex, 1)
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.markDirty()
+  }
+
+  deleteCue(cue) {
+    const index = this.cues.indexOf(cue)
+    if (index === -1) return
+
+    this.cues.splice(index, 1)
+    if (this.activeCue === cue) {
+      this.activeCue = null
+      this.activeCueElement = null
+    }
+
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.markDirty()
+  }
+
+  getCueSplitTime(cue) {
+    const currentTime = this.video?.currentTime
+    if (
+      this.isFiniteNumber(currentTime) &&
+      currentTime > cue.start &&
+      currentTime < cue.end
+    ) {
+      return currentTime
+    }
+
+    return cue.start + (cue.end - cue.start) / 2
+  }
+
+  splitCueText(text, selectionStart = null) {
+    if (!text) return ['', '']
+
+    const splitIndex = this.getTextSplitIndex(text, selectionStart)
+    return [
+      text.slice(0, splitIndex).trim(),
+      text.slice(splitIndex).trim()
+    ]
+  }
+
+  getTextSplitIndex(text, selectionStart = null) {
+    if (
+      Number.isInteger(selectionStart) &&
+      selectionStart > 0 &&
+      selectionStart < text.length
+    ) {
+      return selectionStart
+    }
+
+    const midpoint = Math.floor(text.length / 2)
+    const afterSpace = text.indexOf(' ', midpoint)
+    const beforeSpace = text.lastIndexOf(' ', midpoint)
+
+    if (afterSpace === -1) return beforeSpace === -1 ? midpoint : beforeSpace
+    if (beforeSpace === -1) return afterSpace
+
+    return (afterSpace - midpoint) < (midpoint - beforeSpace)
+      ? afterSpace
+      : beforeSpace
+  }
+
+  joinCueText(firstText = '', secondText = '') {
+    return [firstText, secondText]
+      .map(text => (text || '').trim())
+      .filter(Boolean)
+      .join('\n')
+  }
+
+  createCueId(baseId, suffix) {
+    const nextId = `${baseId ?? this.cues.length + 1}-${suffix}`
+    return this.cues.some(cue => String(cue.id) === nextId)
+      ? `${nextId}-${Date.now()}`
+      : nextId
+  }
+
   addSpeaker(speaker) {
     const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
     if (!nextSpeaker) return
@@ -933,6 +1067,22 @@ class SubtitleEditor extends HTMLElement {
 
       ce.onSetSpeaker = nextSpeaker => {
         this.setCueSpeaker(cue, nextSpeaker)
+      }
+
+      ce.onSplitCue = selection => {
+        this.splitCue(cue, selection)
+      }
+
+      ce.onMergePrevious = () => {
+        this.mergeCueWithPrevious(cue)
+      }
+
+      ce.onMergeNext = () => {
+        this.mergeCueWithNext(cue)
+      }
+
+      ce.onDeleteCue = () => {
+        this.deleteCue(cue)
       }
 
       ce.addEventListener('focusin', () => {
