@@ -1,22 +1,131 @@
 <!doctype html>
 <html lang="en">
-<head>  
-  <title>&lt;wave-form></title>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width">
-  <link rel="stylesheet" href="wave-form.css">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22/>">
+<head>
+  <meta charset="utf-8">
+  <title>wave-form demo</title>
+  <link rel="stylesheet" href="./wave-form.css">
 
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+      background: #f6f8fa;
+    }
+
+    .demo-card {
+      background: white;
+      border: 1px solid #d0d7de;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    label {
+      display: block;
+      margin: 0.75rem 0 0.25rem;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+    }
+
+    code {
+      background: #eef1f4;
+      padding: 0.1rem 0.25rem;
+      border-radius: 4px;
+    }
+  </style>
 </head>
+
 <body>
+  <h1>&lt;wave-form&gt; demo</h1>
 
-    <wave-form id="demo"></wave-form>  
+  <div class="demo-card">
+    <wave-form id="wave"></wave-form>
 
-<script type="module" defer>
-import {WaveForm} from './WaveForm.js'
+    <label>
+      Cue start:
+      <code id="startLabel"></code>
+    </label>
+    <input id="startInput" type="range" min="0" max="9" step="0.05" value="3">
 
-window.waveForm = document.querySelector('wave-form')
-</script>
+    <label>
+      Cue end:
+      <code id="endLabel"></code>
+    </label>
+    <input id="endInput" type="range" min="0.1" max="10" step="0.05" value="6">
 
+    <label>
+      Context window:
+      <code id="contextLabel"></code>
+    </label>
+    <input id="contextInput" type="range" min="0" max="3" step="0.05" value="0.75">
+  </div>
+
+  <script type="module">
+    import { WaveForm } from './WaveForm.js'
+
+    const wave = document.querySelector('#wave')
+    const startInput = document.querySelector('#startInput')
+    const endInput = document.querySelector('#endInput')
+    const contextInput = document.querySelector('#contextInput')
+
+    const startLabel = document.querySelector('#startLabel')
+    const endLabel = document.querySelector('#endLabel')
+    const contextLabel = document.querySelector('#contextLabel')
+
+    const duration = 10
+    const frameDuration = 0.025
+    const frameCount = Math.floor(duration / frameDuration)
+
+    const envelope = Array.from({ length: frameCount }, (_, i) => {
+      const t = i * frameDuration
+
+      const speechy =
+        Math.abs(Math.sin(t * 7)) * 0.6 +
+        Math.abs(Math.sin(t * 17)) * 0.25 +
+        Math.random() * 0.15
+
+      const phraseShape =
+        t > 1 && t < 8.8
+          ? Math.sin((t - 1) / 7.8 * Math.PI)
+          : 0.05
+
+      return speechy * phraseShape
+    })
+
+    function update() {
+      let start = Number(startInput.value)
+      let end = Number(endInput.value)
+
+      if (end <= start) {
+        end = start + 0.1
+        endInput.value = end
+      }
+
+      const contextWindow = Number(contextInput.value)
+
+      startLabel.textContent = `${start.toFixed(2)}s`
+      endLabel.textContent = `${end.toFixed(2)}s`
+      contextLabel.textContent = `${contextWindow.toFixed(2)}s`
+
+      wave.data = {
+        envelope,
+        frameDuration,
+        start,
+        end,
+        contextWindow
+      }
+    }
+
+    startInput.addEventListener('input', update)
+    endInput.addEventListener('input', update)
+    contextInput.addEventListener('input', update)
+
+    update()
+  </script>
 </body>
 </html>
