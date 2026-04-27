@@ -1,0 +1,31 @@
+wave-form {
+  display: block;
+}
+
+wave-form .wave-form-wrapper {
+  margin-bottom: 0.4rem;
+}
+
+wave-form .wave-form-svg {
+  width: 100%;
+  height: 40px;
+  display: block;
+}
+
+wave-form path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+wave-form .wf-prev,
+wave-form .wf-next {
+  stroke: #cfd4da;
+  opacity: 0.9;
+}
+
+wave-form .wf-current {
+  stroke: #6cb6ff;
+  stroke-width: 2;
+  opacity: 1;
+}

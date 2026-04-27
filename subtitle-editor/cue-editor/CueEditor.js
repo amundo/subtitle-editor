@@ -1,3 +1,4 @@
+import {WaveForm} from '../wave-form/WaveForm.js'
 // cue-editor/CueEditor.js
 class CueEditor extends HTMLElement {
   #data = null
@@ -52,10 +53,7 @@ class CueEditor extends HTMLElement {
       : 'speaker-pill is-empty'
 
     this.innerHTML = `
-        <div class="cue-waveform-wrapper">
-          <svg class="cue-waveform" viewBox="0 0 100 40" preserveAspectRatio="none"
-               data-role="waveform"></svg>
-        </div>
+        <wave-form data-role="waveform"></wave-form>
 
         <div class="cue-meta-row">
           <button class="${speakerClassName}" data-role="speakerPill" type="button"
@@ -131,7 +129,7 @@ class CueEditor extends HTMLElement {
   }
 
   cacheEls() {
-    this.waveformSvg = this.querySelector('[data-role="waveform"]')
+    this.waveForm = this.querySelector('[data-role="waveform"]')
     this.startLabel = this.querySelector('[data-role="startLabel"]')
     this.endLabel = this.querySelector('[data-role="endLabel"]')
     this.textarea = this.querySelector('[data-role="text"]')
@@ -223,79 +221,15 @@ class CueEditor extends HTMLElement {
   }
 
   renderWaveform() {
-    if (
-      !this.waveformSvg ||
-      !this.envelope ||
-      !this.frameDuration ||
-      !this.#data
-    ) {
-      if (this.waveformSvg) this.waveformSvg.innerHTML = ''
-      return
+    if (!this.waveForm || !this.#data) return
+
+    this.waveForm.data = {
+      envelope: this.envelope,
+      frameDuration: this.frameDuration,
+      start: this.#data.start,
+      end: this.#data.end,
+      contextWindow: this.contextWindow
     }
-
-    const env = this.envelope
-    const fd = this.frameDuration
-    const contextWindow = this.contextWindow || 0.75
-
-    const start = this.#data.start
-    const end = this.#data.end
-    const duration = env.length * fd
-
-    const tPrevStart = Math.max(0, start - contextWindow)
-    const tPrevEnd = start
-    const tCurrStart = start
-    const tCurrEnd = end
-    const tNextStart = end
-    const tNextEnd = Math.min(duration, end + contextWindow)
-
-    const i0 = Math.floor(tPrevStart / fd)
-    const i1 = Math.floor(tPrevEnd / fd)
-    const i2 = Math.floor(tCurrEnd / fd)
-    const i3 = Math.floor(tNextEnd / fd)
-
-    const prevSlice = env.slice(i0, i1)
-    const currSlice = env.slice(i1, i2)
-    const nextSlice = env.slice(i2, i3)
-
-    const dTotalPrev = (i1 - i0) * fd
-    const dCurr = (i2 - i1) * fd
-    const dNext = (i3 - i2) * fd
-    const total = dTotalPrev + dCurr + dNext || 1
-
-    const width = 100
-    const height = 40
-
-    const buildPath = (slice, xStart, xEnd) => {
-      if (!slice.length) return ''
-      const max = Math.max(...slice) || 1
-      const min = 0
-      const dx = slice.length > 1 ? (xEnd - xStart) / (slice.length - 1) : 0
-      let d = ''
-      slice.forEach((v, idx) => {
-        const x = xStart + dx * idx
-        const norm = (v - min) / (max - min || 1)
-        const y = height - norm * (height - 4) - 2 // small vertical padding
-        d += (idx === 0 ? 'M' : 'L') + x.toFixed(2) + ' ' + y.toFixed(2) + ' '
-      })
-      return d
-    }
-
-    const xPrevStart = 0
-    const xPrevEnd = (dTotalPrev / total) * width
-    const xCurrStart = xPrevEnd
-    const xCurrEnd = xPrevEnd + (dCurr / total) * width
-    const xNextStart = xCurrEnd
-    const xNextEnd = width
-
-    const prevPath = buildPath(prevSlice, xPrevStart, xPrevEnd)
-    const currPath = buildPath(currSlice, xCurrStart, xCurrEnd)
-    const nextPath = buildPath(nextSlice, xNextStart, xNextEnd)
-
-    this.waveformSvg.innerHTML = `
-      <path class="wf-prev" d="${prevPath}"></path>
-      <path class="wf-current" d="${currPath}"></path>
-      <path class="wf-next" d="${nextPath}"></path>
-    `
   }
 
   getNextSpeaker() {

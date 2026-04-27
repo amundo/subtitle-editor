@@ -1,3 +1,5 @@
+@import "../wave-form/wave-form.css";
+
 /* cue-editor/cue-editor.css */
 cue-editor {
   padding: 0.75rem 1rem 1rem;
@@ -8,10 +10,6 @@ cue-editor {
 
   textarea {
     font-family: "Courier New", ui-monospace, monospace;
-  }
-
-  .cue-waveform-wrapper {
-    margin-bottom: 0.4rem;
   }
 
   .cue-meta-row {
@@ -67,29 +65,6 @@ cue-editor {
 
     &:hover {
       background: #ffebe9;
-    }
-  }
-
-  .cue-waveform {
-    width: 100%;
-    height: 40px;
-
-    path {
-      fill: none;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
-    .wf-prev,
-    .wf-next {
-      stroke: #cfd4da;
-      opacity: 0.9;
-    }
-
-    .wf-current {
-      stroke: #6cb6ff;
-      stroke-width: 2;
-      opacity: 1;
     }
   }
 
