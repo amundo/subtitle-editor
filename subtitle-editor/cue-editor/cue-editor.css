@@ -10,6 +10,7 @@ cue-editor {
 
   textarea {
     font-family: "Courier New", ui-monospace, monospace;
+    font-size: var(--cue-font-size, 1em);
   }
 
   .cue-meta-row {

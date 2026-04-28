@@ -11,6 +11,9 @@ class SubtitleEditor extends HTMLElement {
     this.loadedTranscriptPath = null
     this.previewEnd = null
     this.previewTrackUrl = null
+    this.cueFontSizeEm = 1
+    this.minCueFontSizeEm = 0.6
+    this.maxCueFontSizeEm = 2
     this.autosaveEnabled = true
     this.autosaveDelayMs = 1200
     this.autosaveTimer = null
@@ -44,42 +47,27 @@ class SubtitleEditor extends HTMLElement {
 
   renderShell() {
     this.innerHTML = `
-        <div class="media-column">
-          <div class="controls">
-            <img id="cuebert-logo" src="../icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
-            <span class="file-inputs">
-              <label class="file-load-button">
-                <span>Load media</span>
-                <input class="visually-hidden-file" type="file" data-role="videoFile" accept="video/*,audio/*">
-              </label>
-              <label class="file-load-button">
-                <span>Load aTrain</span>
-                <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
-              </label>
-            </span><!-- .file-inputs -->
-          </div>
-          <video data-role="video" controls>
-            <track
-              data-role="previewTrack"
-              kind="subtitles"
-              srclang="en"
-              label="Edited subtitles"
-              default
-            >
-          </video>
-          <div class="current-time-row">
-            Current time:
-            <span data-role="currentTime" class="time-label">00:00:00.000</span>
-          </div>
-        </div>
+        <header class="top-toolbar">
+          <img id="cuebert-logo" src="../icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
+          <span class="file-inputs">
+            <label class="file-load-button">
+              <span>Load media</span>
+              <input class="visually-hidden-file" type="file" data-role="videoFile" accept="video/*,audio/*">
+            </label>
+            <label class="file-load-button">
+              <span>Load aTrain</span>
+              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
+            </label>
+          </span>
+        </header>
 
         <div class="cues-column">
           <div class="cue-panel-header">
             <strong>Cues</strong>
             <div class="cue-panel-actions">
               <span class="adjust-font-size">
-                <button data-role="increaseFontBtn">A+</button>
                 <button data-role="decreaseFontBtn">A-</button>
+                <button data-role="increaseFontBtn">A+</button>
               </span>
 
               <span data-role="autosaveStatus" class="autosave-status">Autosave ready</span>
@@ -96,6 +84,47 @@ class SubtitleEditor extends HTMLElement {
           </div>
           <div data-role="cueList" class="cue-list"></div>
         </div>
+
+        <footer class="media-bar">
+          <video data-role="video" preload="metadata" aria-hidden="true" tabindex="-1">
+            <track
+              data-role="previewTrack"
+              kind="subtitles"
+              srclang="en"
+              label="Edited subtitles"
+              default
+            >
+          </video>
+          <div class="transport-controls" role="group" aria-label="Media playback controls">
+            <button data-role="mediaPlayBtn" class="transport-button" type="button" aria-label="Play">▶</button>
+            <input
+              data-role="mediaSeek"
+              class="media-seek"
+              type="range"
+              min="0"
+              max="0"
+              step="0.01"
+              value="0"
+              aria-label="Media position"
+            >
+            <div class="current-time-row">
+              <span data-role="currentTime" class="time-label">00:00:00.000</span>
+              <span class="time-divider">/</span>
+              <span data-role="durationTime" class="time-label">00:00:00.000</span>
+            </div>
+            <button data-role="mediaMuteBtn" class="transport-button" type="button" aria-label="Mute">▮))</button>
+            <input
+              data-role="mediaVolume"
+              class="media-volume"
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value="1"
+              aria-label="Volume"
+            >
+          </div>
+        </footer>
 
         <dialog data-role="speakerDialog" class="speaker-dialog">
           <div class="speaker-panel">
@@ -126,6 +155,11 @@ class SubtitleEditor extends HTMLElement {
     this.video = this.querySelector('[data-role="video"]')
     this.previewTrack = this.querySelector('[data-role="previewTrack"]')
     this.currentTimeLabel = this.querySelector('[data-role="currentTime"]')
+    this.durationTimeLabel = this.querySelector('[data-role="durationTime"]')
+    this.mediaPlayBtn = this.querySelector('[data-role="mediaPlayBtn"]')
+    this.mediaSeek = this.querySelector('[data-role="mediaSeek"]')
+    this.mediaMuteBtn = this.querySelector('[data-role="mediaMuteBtn"]')
+    this.mediaVolume = this.querySelector('[data-role="mediaVolume"]')
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
@@ -149,17 +183,34 @@ class SubtitleEditor extends HTMLElement {
 
   bindEvents() {
     this.video.addEventListener('timeupdate', () => {
-      this.currentTimeLabel.textContent = this.formatTime(this.video.currentTime)
+      this.updateTransportUi()
       if (this.previewEnd !== null && this.video.currentTime >= this.previewEnd) {
         this.video.pause()
         this.previewEnd = null
       }
     })
 
+    this.video.addEventListener('loadedmetadata', () => {
+      this.updateTransportUi()
+    })
+
+    this.video.addEventListener('durationchange', () => {
+      this.updateTransportUi()
+    })
+
+    this.video.addEventListener('play', () => {
+      this.updateTransportUi()
+    })
+
+    this.video.addEventListener('pause', () => {
+      this.updateTransportUi()
+    })
+
     this.videoFileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       this.video.src = URL.createObjectURL(file)
+      this.updateTransportUi()
       this.ensurePreviewTrackShowing()
       // kick off async audio analysis
       this.initAudioAnalysis(file).catch(err => {
@@ -259,14 +310,94 @@ class SubtitleEditor extends HTMLElement {
       this.ensurePreviewTrackShowing()
     })
 
+    this.mediaPlayBtn?.addEventListener('click', () => {
+      if (!this.video.src) return
+      if (this.video.paused) {
+        this.video.play().catch(err => {
+          console.error('Media playback failed:', err)
+        })
+      } else {
+        this.video.pause()
+      }
+    })
+
+    this.mediaSeek?.addEventListener('input', () => {
+      const nextTime = Number(this.mediaSeek.value)
+      if (Number.isFinite(nextTime)) {
+        this.video.currentTime = nextTime
+        this.updateTransportUi()
+      }
+    })
+
+    this.mediaMuteBtn?.addEventListener('click', () => {
+      this.video.muted = !this.video.muted
+      this.updateTransportUi()
+    })
+
+    this.mediaVolume?.addEventListener('input', () => {
+      const nextVolume = Number(this.mediaVolume.value)
+      if (!Number.isFinite(nextVolume)) return
+
+      this.video.volume = Math.min(1, Math.max(0, nextVolume))
+      this.video.muted = this.video.volume === 0
+      this.updateTransportUi()
+    })
+
     this.adjustFontSizeButtons.increase?.addEventListener('click', () => {
-      document.documentElement.style.setProperty('--cue-font-size', '1.25em')
+      this.adjustCueFontSize(0.1)
     })
 
     this.adjustFontSizeButtons.decrease?.addEventListener('click', () => {
-      document.documentElement.style.setProperty('--cue-font-size', '0.75em')
+      this.adjustCueFontSize(-0.1)
     })
 
+    this.updateTransportUi()
+  }
+
+  adjustCueFontSize(deltaEm) {
+    const nextSize = Math.min(
+      this.maxCueFontSizeEm,
+      Math.max(this.minCueFontSizeEm, this.cueFontSizeEm + deltaEm)
+    )
+
+    this.cueFontSizeEm = Math.round(nextSize * 10) / 10
+    document.documentElement.style.setProperty('--cue-font-size', `${this.cueFontSizeEm}em`)
+  }
+
+  updateTransportUi() {
+    if (!this.video) return
+
+    const duration = Number.isFinite(this.video.duration) ? this.video.duration : 0
+    const currentTime = Number.isFinite(this.video.currentTime) ? this.video.currentTime : 0
+
+    if (this.currentTimeLabel) {
+      this.currentTimeLabel.textContent = this.formatTime(currentTime)
+    }
+
+    if (this.durationTimeLabel) {
+      this.durationTimeLabel.textContent = this.formatTime(duration)
+    }
+
+    if (this.mediaSeek) {
+      this.mediaSeek.max = String(duration)
+      this.mediaSeek.value = String(Math.min(currentTime, duration || currentTime))
+      this.mediaSeek.disabled = duration === 0
+    }
+
+    if (this.mediaPlayBtn) {
+      this.mediaPlayBtn.textContent = this.video.paused ? '▶' : '❚❚'
+      this.mediaPlayBtn.disabled = !this.video.src
+      this.mediaPlayBtn.setAttribute('aria-label', this.video.paused ? 'Play' : 'Pause')
+    }
+
+    if (this.mediaMuteBtn) {
+      this.mediaMuteBtn.textContent = this.video.muted || this.video.volume === 0 ? '▮×' : '▮))'
+      this.mediaMuteBtn.setAttribute('aria-label', this.video.muted ? 'Unmute' : 'Mute')
+    }
+
+    if (this.mediaVolume) {
+      this.mediaVolume.value = String(this.video.muted ? 0 : this.video.volume)
+    }
   }
 
   // ---------- audio analysis ----------
