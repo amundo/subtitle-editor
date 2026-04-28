@@ -15,7 +15,7 @@ body {
   outline-offset: 2px;
 }
 
-subtitle-editor {
+cue-bert {
   font-family: system-ui, sans-serif;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
@@ -94,6 +94,17 @@ subtitle-editor {
 
   .transport-button:not(:disabled):hover {
     background: rgb(255 255 255 / 0.12);
+  }
+
+  .transport-icon {
+    inline-size: 1.45rem;
+    block-size: 1.45rem;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
   }
 
   .media-seek,

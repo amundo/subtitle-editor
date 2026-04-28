@@ -48,7 +48,7 @@ class SubtitleEditor extends HTMLElement {
   renderShell() {
     this.innerHTML = `
         <header class="top-toolbar">
-          <img id="cuebert-logo" src="../icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
+          <img id="cuebert-logo" src="./icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
           <span class="file-inputs">
             <label class="file-load-button">
               <span>Load media</span>
@@ -112,7 +112,7 @@ class SubtitleEditor extends HTMLElement {
               <span class="time-divider">/</span>
               <span data-role="durationTime" class="time-label">00:00:00.000</span>
             </div>
-            <button data-role="mediaMuteBtn" class="transport-button" type="button" aria-label="Mute">▮))</button>
+            <button data-role="mediaMuteBtn" class="transport-button" type="button" aria-label="Mute">${this.renderVolumeIcon(false)}</button>
             <input
               data-role="mediaVolume"
               class="media-volume"
@@ -387,13 +387,26 @@ class SubtitleEditor extends HTMLElement {
     }
 
     if (this.mediaMuteBtn) {
-      this.mediaMuteBtn.textContent = this.video.muted || this.video.volume === 0 ? '▮×' : '▮))'
+      this.mediaMuteBtn.innerHTML = this.renderVolumeIcon(this.video.muted || this.video.volume === 0)
       this.mediaMuteBtn.setAttribute('aria-label', this.video.muted ? 'Unmute' : 'Mute')
     }
 
     if (this.mediaVolume) {
       this.mediaVolume.value = String(this.video.muted ? 0 : this.video.volume)
     }
+  }
+
+  renderVolumeIcon(muted) {
+    const waves = muted
+      ? '<line x1="18" y1="9" x2="23" y2="14"></line><line x1="23" y1="9" x2="18" y2="14"></line>'
+      : '<path d="M18 9a5 5 0 0 1 0 6"></path><path d="M21 6a9 9 0 0 1 0 12"></path>'
+
+    return `
+      <svg class="transport-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+        ${waves}
+      </svg>
+    `
   }
 
   // ---------- audio analysis ----------
@@ -1363,5 +1376,5 @@ class SubtitleEditor extends HTMLElement {
   }
 }
 
-customElements.define('subtitle-editor', SubtitleEditor)
+customElements.define('cue-bert', SubtitleEditor)
 export { SubtitleEditor }

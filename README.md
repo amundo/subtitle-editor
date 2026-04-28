@@ -1,7 +1,7 @@
 ---
-title: Subtitle editing tool
+title: Cuebert
 author: Patrick Hall
-description: A web-based subtitle editing tool for transcribing VTT files from audio or video.
+description: Cuebert is a web-based subtitle editing tool for transcribing VTT files from audio or video.
 ---
 
 This is aan exprimental UI for editing subtitles (VTT format) directly from media. 
@@ -44,10 +44,8 @@ Build a desktop bundle:
 deno task build
 ```
 
-The Tauri app points directly at the existing static frontend in `subtitle-editor/`, so there is no separate web build step right now.
+The Tauri app points directly at the existing static frontend in `cuebert/`, so there is no separate web build step right now.
 
 ### Audio analysis
 
 Waveforms are created by analyzing the audio data using the Web Audio API. The audio file is loaded into an AudioBuffer, and then the samples are processed to create a visual representation of the waveform. Simple waveforms are rendered with lightweight `SVG` elements for scalability and performance. 
-
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-svg_path="${1:-icons/cuebert.svg}"
+svg_path="${1:-cuebert/icons/cuebert.svg}"
 icon_dir="src-tauri/icons"
 iconset_dir="$icon_dir/Cuebert.iconset"
 
