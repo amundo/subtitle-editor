@@ -9,6 +9,8 @@
     "core:default",
     "dialog:default",
     "fs:default",
+    "fs:read-files",
+    "fs:allow-read-text-file",
     "fs:write-files",
     "fs:write-all",
     "fs:allow-write-text-file"

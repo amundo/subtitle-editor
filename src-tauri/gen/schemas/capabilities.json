@@ -1,1 +1,1 @@
-{"main-capability":{"identifier":"main-capability","description":"Capability for the main window","local":true,"windows":["main"],"permissions":["core:default","dialog:default","fs:default","fs:write-files","fs:write-all","fs:allow-write-text-file"]}}
+{"main-capability":{"identifier":"main-capability","description":"Capability for the main window","local":true,"windows":["main"],"permissions":["core:default","dialog:default","fs:default","fs:read-files","fs:allow-read-text-file","fs:write-files","fs:write-all","fs:allow-write-text-file"]}}

@@ -56,7 +56,7 @@ class SubtitleEditor extends HTMLElement {
             </label>
             <label class="file-load-button">
               <span>Load aTrain</span>
-              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".vtt,.json,application/json,text/vtt">
+              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".json,application/json">
             </label>
           </span>
         </header>
@@ -217,31 +217,27 @@ class SubtitleEditor extends HTMLElement {
         console.error('Audio analysis failed:', err)
       })
     })
+    this.vttFileInput.addEventListener('click', e => {
+      if (!this.canUseNativeTranscriptPicker()) return
+
+      e.preventDefault()
+      this.openNativeTranscriptFile().catch(err => {
+        console.error('Subtitle parsing failed:', err)
+        alert('Could not load that aTrain JSON file.')
+      })
+    })
+
     this.vttFileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       file.text().then(text => {
-        const parsed = this.parseSubtitleFile(text, file.name)
-        this.cues = parsed.cues
-        this.loadedTranscript = parsed.sourceData
-        this.loadedTranscriptFormat = parsed.format
-        this.loadedTranscriptPath = this.getFilePath(file)
-        this.manualSpeakers = []
-        this.hasUnsavedChanges = false
-        this.changeRevision = 0
-        this.lastAutosavedAt = null
-        this.renderSpeakerEditor()
-        this.renderCues()
-        this.refreshPreviewTrack()
-        this.saveBtn.disabled = parsed.format !== 'atrain-json'
-        this.downloadBtn.disabled = false
-        this.downloadTextBtn.disabled = false
-        this.updateAutosaveStatus()
+        this.loadTranscriptText(text, {
+          fileName: file.name,
+          sourcePath: this.getFilePath(file)
+        })
       }).catch(err => {
         console.error('Subtitle parsing failed:', err)
-        alert(
-          'Could not parse that subtitle file. This editor currently supports WebVTT and the aTrain/Whisper-style JSON sample format.'
-        )
+        alert('Could not load that aTrain JSON file.')
       })
     })
 
@@ -493,6 +489,44 @@ class SubtitleEditor extends HTMLElement {
     const m = str.match(/(\d+):(\d+):(\d+\.\d+)/)
     if (!m) return 0
     return +m[1] * 3600 + +m[2] * 60 + +m[3]
+  }
+
+  canUseNativeTranscriptPicker() {
+    return Boolean(window.__TAURI__?.dialog?.open && window.__TAURI__?.fs?.readTextFile)
+  }
+
+  async openNativeTranscriptFile() {
+    const selectedPath = await window.__TAURI__.dialog.open({
+      multiple: false,
+      filters: [{ name: 'aTrain JSON', extensions: ['json'] }]
+    })
+
+    if (!selectedPath || Array.isArray(selectedPath)) return
+
+    const text = await window.__TAURI__.fs.readTextFile(selectedPath)
+    this.loadTranscriptText(text, {
+      fileName: this.getPathFileName(selectedPath),
+      sourcePath: selectedPath
+    })
+  }
+
+  loadTranscriptText(text, { fileName = '', sourcePath = null } = {}) {
+    const parsed = this.parseSubtitleFile(text, fileName)
+    this.cues = parsed.cues
+    this.loadedTranscript = parsed.sourceData
+    this.loadedTranscriptFormat = parsed.format
+    this.loadedTranscriptPath = sourcePath
+    this.manualSpeakers = []
+    this.hasUnsavedChanges = false
+    this.changeRevision = 0
+    this.lastAutosavedAt = null
+    this.renderSpeakerEditor()
+    this.renderCues()
+    this.refreshPreviewTrack()
+    this.saveBtn.disabled = parsed.format !== 'atrain-json'
+    this.downloadBtn.disabled = false
+    this.downloadTextBtn.disabled = false
+    this.updateAutosaveStatus()
   }
 
   // ---------- VTT parsing/building ----------
@@ -875,6 +909,12 @@ class SubtitleEditor extends HTMLElement {
 
   getFilePath(file) {
     return file?.path || file?.webkitRelativePath || null
+  }
+
+  getPathFileName(path) {
+    return typeof path === 'string'
+      ? path.split(/[\\/]/).pop() || ''
+      : ''
   }
 
   markSavedToPath(targetPath) {
