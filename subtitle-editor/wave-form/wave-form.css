@@ -13,19 +13,16 @@ wave-form .wave-form-svg {
 }
 
 wave-form path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  stroke: none;
 }
 
 wave-form .wf-prev,
 wave-form .wf-next {
-  stroke: #cfd4da;
-  opacity: 0.9;
+  fill: #d0d4da;
+  opacity: 1;
 }
 
 wave-form .wf-current {
-  stroke: #6cb6ff;
-  stroke-width: 2;
+  fill: #4daaaa;
   opacity: 1;
 }

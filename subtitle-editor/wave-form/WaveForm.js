@@ -87,34 +87,48 @@ class WaveForm extends HTMLElement {
 
     const width = 100
     const height = 40
+    const bottomY = height
 
-    const buildPath = (slice, xStart, xEnd) => {
+    const visibleSlice = env.slice(i0, i3)
+    const max = Math.max(...visibleSlice) || 1
+
+    const buildAreaPath = (slice, xStart, xEnd) => {
       if (!slice.length) return ''
 
-      const max = Math.max(...slice) || 1
       const dx = slice.length > 1
         ? (xEnd - xStart) / (slice.length - 1)
         : 0
 
-      return slice.map((v, idx) => {
+      const points = slice.map((v, idx) => {
         const x = xStart + dx * idx
         const norm = v / max
         const y = height - norm * (height - 4) - 2
+        return [x, y]
+      })
 
-        return `${idx === 0 ? 'M' : 'L'}${x.toFixed(2)} ${y.toFixed(2)}`
-      }).join(' ')
+      return [
+        `M ${xStart.toFixed(2)} ${bottomY.toFixed(2)}`,
+        ...points.map(([x, y], idx) => {
+          const command = idx === 0 ? 'L' : 'L'
+          return `${command} ${x.toFixed(2)} ${y.toFixed(2)}`
+        }),
+        `L ${xEnd.toFixed(2)} ${bottomY.toFixed(2)}`,
+        'Z'
+      ].join(' ')
     }
 
     const xPrevStart = 0
     const xPrevEnd = (dPrev / total) * width
+
     const xCurrStart = xPrevEnd
     const xCurrEnd = xPrevEnd + (dCurr / total) * width
+
     const xNextStart = xCurrEnd
     const xNextEnd = width
 
-    const prevPath = buildPath(prevSlice, xPrevStart, xPrevEnd)
-    const currPath = buildPath(currSlice, xCurrStart, xCurrEnd)
-    const nextPath = buildPath(nextSlice, xNextStart, xNextEnd)
+    const prevPath = buildAreaPath(prevSlice, xPrevStart, xPrevEnd)
+    const currPath = buildAreaPath(currSlice, xCurrStart, xCurrEnd)
+    const nextPath = buildAreaPath(nextSlice, xNextStart, xNextEnd)
 
     this.svg.innerHTML = `
       <path class="wf-prev" d="${prevPath}"></path>

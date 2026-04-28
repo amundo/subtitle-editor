@@ -77,6 +77,11 @@ class SubtitleEditor extends HTMLElement {
           <div class="cue-panel-header">
             <strong>Cues</strong>
             <div class="cue-panel-actions">
+              <span class="adjust-font-size">
+                <button data-role="increaseFontBtn">A+</button>
+                <button data-role="decreaseFontBtn">A-</button>
+              </span>
+
               <span data-role="autosaveStatus" class="autosave-status">Autosave ready</span>
               <label class="autosave-toggle">
                 <input type="checkbox" data-role="autosaveToggle" checked>
@@ -135,6 +140,11 @@ class SubtitleEditor extends HTMLElement {
     this.addSpeakerForm = this.querySelector('[data-role="addSpeakerForm"]')
     this.addSpeakerInput = this.querySelector('[data-role="addSpeakerInput"]')
     this.speakerList = this.querySelector('[data-role="speakerList"]')
+    this.cuebertLogo = this.querySelector('#cuebert-logo')
+    this.adjustFontSizeButtons = {  
+      increase: this.querySelector('[data-role="increaseFontBtn"]'),
+      decrease: this.querySelector('[data-role="decreaseFontBtn"]')
+    }
   }
 
   bindEvents() {
@@ -247,6 +257,14 @@ class SubtitleEditor extends HTMLElement {
 
     this.previewTrack?.addEventListener('load', () => {
       this.ensurePreviewTrackShowing()
+    })
+
+    this.adjustFontSizeButtons.increase?.addEventListener('click', () => {
+      document.documentElement.style.setProperty('--cue-font-size', '1.25em')
+    })
+
+    this.adjustFontSizeButtons.decrease?.addEventListener('click', () => {
+      document.documentElement.style.setProperty('--cue-font-size', '0.75em')
     })
 
   }
