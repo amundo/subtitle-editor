@@ -12,8 +12,10 @@
   <cue-bert id="demo"></cue-bert>
 
   <script type="module" defer>
+    import { installCuebertLogger } from './app-logger.js'
     import { SubtitleEditor } from './SubtitleEditor.js'
 
+    installCuebertLogger()
     window.cuebert = document.querySelector('cue-bert')
   </script>
 

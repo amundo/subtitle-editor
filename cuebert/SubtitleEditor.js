@@ -9,6 +9,8 @@ class SubtitleEditor extends HTMLElement {
     this.loadedTranscript = null
     this.loadedTranscriptFormat = null
     this.loadedTranscriptPath = null
+    this.mediaLoadedFromPath = null
+    this.autoLoadedMediaPath = null
     this.previewEnd = null
     this.previewTrackUrl = null
     this.cueFontSizeEm = 1
@@ -32,6 +34,10 @@ class SubtitleEditor extends HTMLElement {
     // active cue for focused editor state
     this.activeCue = null
     this.activeCueElement = null
+    this.cueElementByCue = new Map()
+    this.playbackCue = null
+    this.playbackCueElement = null
+    this.previewCueListeners = []
   }
 
   connectedCallback() {
@@ -42,6 +48,7 @@ class SubtitleEditor extends HTMLElement {
 
   disconnectedCallback() {
     this.cancelScheduledAutosave()
+    this.clearPreviewCueListeners()
     this.revokePreviewTrackUrl()
   }
 
@@ -50,13 +57,13 @@ class SubtitleEditor extends HTMLElement {
         <header class="top-toolbar">
           <img id="cuebert-logo" src="./icons/cuebert-logo.svg" alt="Cuebert logo" class="logo">
           <span class="file-inputs">
-            <label class="file-load-button">
+            <label class="file-load-button" data-role="mediaLoadControl" hidden>
               <span>Load media</span>
               <input class="visually-hidden-file" type="file" data-role="videoFile" accept="video/*,audio/*">
             </label>
             <label class="file-load-button">
-              <span>Load aTrain</span>
-              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".json,application/json">
+              <span>Load transcript</span>
+              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".json,.vtt,application/json,text/vtt">
             </label>
           </span>
         </header>
@@ -77,7 +84,7 @@ class SubtitleEditor extends HTMLElement {
               </label>
               <button data-role="editSpeakersBtn" hidden>Edit speakers</button>
               Export:
-              <button data-role="saveBtn" disabled>aTrain</button>
+              <button data-role="saveBtn" disabled>Cuebert JSON</button>
               <button data-role="downloadTextBtn" disabled>TXT</button>
               <button data-role="downloadBtn" disabled>VTT</button>
             </div>
@@ -160,6 +167,7 @@ class SubtitleEditor extends HTMLElement {
     this.mediaSeek = this.querySelector('[data-role="mediaSeek"]')
     this.mediaMuteBtn = this.querySelector('[data-role="mediaMuteBtn"]')
     this.mediaVolume = this.querySelector('[data-role="mediaVolume"]')
+    this.mediaLoadControl = this.querySelector('[data-role="mediaLoadControl"]')
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
@@ -184,6 +192,7 @@ class SubtitleEditor extends HTMLElement {
   bindEvents() {
     this.video.addEventListener('timeupdate', () => {
       this.updateTransportUi()
+      this.syncActiveCueToPlayback('timeupdate')
       if (this.previewEnd !== null && this.video.currentTime >= this.previewEnd) {
         this.video.pause()
         this.previewEnd = null
@@ -200,6 +209,7 @@ class SubtitleEditor extends HTMLElement {
 
     this.video.addEventListener('play', () => {
       this.updateTransportUi()
+      this.syncActiveCueToPlayback('play')
     })
 
     this.video.addEventListener('pause', () => {
@@ -209,6 +219,8 @@ class SubtitleEditor extends HTMLElement {
     this.videoFileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
+      this.mediaLoadedFromPath = this.getFilePath(file)
+      this.autoLoadedMediaPath = null
       this.video.src = URL.createObjectURL(file)
       this.updateTransportUi()
       this.ensurePreviewTrackShowing()
@@ -216,6 +228,8 @@ class SubtitleEditor extends HTMLElement {
       this.initAudioAnalysis(file).catch(err => {
         console.error('Audio analysis failed:', err)
       })
+      if (this.mediaLoadedFromPath) this.markMediaPathChanged()
+      this.updateMediaLoadControlVisibility()
     })
     this.vttFileInput.addEventListener('click', e => {
       if (!this.canUseNativeTranscriptPicker()) return
@@ -259,7 +273,7 @@ class SubtitleEditor extends HTMLElement {
 
       const json = this.buildAtrainJson(this.cues, this.loadedTranscript)
       this.saveTextOutput({
-        defaultPath: 'transcription-edited.json',
+        defaultPath: this.getCuebertJsonDefaultPath(),
         filters: [{ name: 'JSON', extensions: ['json'] }],
         contents: JSON.stringify(json, null, 2),
         mimeType: 'application/json'
@@ -304,6 +318,8 @@ class SubtitleEditor extends HTMLElement {
 
     this.previewTrack?.addEventListener('load', () => {
       this.ensurePreviewTrackShowing()
+      this.bindPreviewCueEvents()
+      this.syncActiveCueToPlayback('trackload')
     })
 
     this.mediaPlayBtn?.addEventListener('click', () => {
@@ -508,10 +524,14 @@ class SubtitleEditor extends HTMLElement {
     return Boolean(window.__TAURI__?.dialog?.open && window.__TAURI__?.fs?.readTextFile)
   }
 
+  canFindMatchingMedia() {
+    return Boolean(window.__TAURI__?.core?.invoke && window.__TAURI__?.core?.convertFileSrc)
+  }
+
   async openNativeTranscriptFile() {
     const selectedPath = await window.__TAURI__.dialog.open({
       multiple: false,
-      filters: [{ name: 'aTrain JSON', extensions: ['json'] }]
+      filters: [{ name: 'Transcripts', extensions: ['json', 'vtt'] }]
     })
 
     if (!selectedPath || Array.isArray(selectedPath)) return
@@ -521,6 +541,88 @@ class SubtitleEditor extends HTMLElement {
       fileName: this.getPathFileName(selectedPath),
       sourcePath: selectedPath
     })
+  }
+
+  async loadMatchingMediaForTranscript(transcriptPath) {
+    if (!transcriptPath || !this.canFindMatchingMedia()) return
+    if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
+
+    const mediaPath = await window.__TAURI__.core.invoke('find_matching_media', {
+      transcriptPath
+    })
+    if (!mediaPath || mediaPath === this.mediaLoadedFromPath) return
+
+    await this.loadMediaFromPath(mediaPath)
+    this.autoLoadedMediaPath = mediaPath
+    this.mediaLoadedFromPath = mediaPath
+    this.updateMediaLoadControlVisibility()
+    window.cuebertLog?.('info', 'auto-loaded-matching-media', {
+      transcriptPath,
+      mediaPath
+    })
+  }
+
+  async loadMediaForTranscript(transcriptPath, sourceData) {
+    if (!this.canFindMatchingMedia()) return
+    if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
+
+    const metadataMediaPath = this.getTranscriptMetadataMediaPath(sourceData)
+    if (metadataMediaPath) {
+      try {
+        await this.loadMediaFromPath(metadataMediaPath)
+        this.autoLoadedMediaPath = metadataMediaPath
+        this.mediaLoadedFromPath = metadataMediaPath
+        this.updateMediaLoadControlVisibility()
+        window.cuebertLog?.('info', 'loaded-transcript-metadata-media', {
+          transcriptPath,
+          mediaPath: metadataMediaPath
+        })
+        return
+      } catch (err) {
+        console.warn('Metadata media load failed; trying matching filename:', err)
+      }
+    }
+
+    await this.loadMatchingMediaForTranscript(transcriptPath)
+  }
+
+  async loadMediaFromPath(mediaPath) {
+    const mediaUrl = window.__TAURI__.core.convertFileSrc(mediaPath)
+    let blob = null
+
+    try {
+      const response = await fetch(mediaUrl)
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      blob = await response.blob()
+    } catch (err) {
+      this.video.removeAttribute('src')
+      this.updateTransportUi()
+      throw err
+    }
+
+    this.video.src = mediaUrl
+    this.updateTransportUi()
+    this.ensurePreviewTrackShowing()
+
+    try {
+      await this.initAudioAnalysis(blob)
+    } catch (err) {
+      console.warn('Auto-loaded media is playable, but waveform analysis failed:', err)
+    }
+  }
+
+  getTranscriptMetadataMediaPath(sourceData) {
+    const media = sourceData?.metadata?.media
+    if (typeof media === 'string') return media.trim()
+    if (media && typeof media.path === 'string') return media.path.trim()
+    return ''
+  }
+
+  updateMediaLoadControlVisibility(sourceData = this.loadedTranscript) {
+    if (!this.mediaLoadControl) return
+    this.mediaLoadControl.hidden = Boolean(
+      this.getTranscriptMetadataMediaPath(sourceData) || this.mediaLoadedFromPath
+    )
   }
 
   loadTranscriptText(text, { fileName = '', sourcePath = null } = {}) {
@@ -536,9 +638,13 @@ class SubtitleEditor extends HTMLElement {
     this.renderSpeakerEditor()
     this.renderCues()
     this.refreshPreviewTrack()
+    this.loadMediaForTranscript(sourcePath, parsed.sourceData).catch(err => {
+      console.warn('Transcript media load failed:', err)
+    })
     this.saveBtn.disabled = parsed.format !== 'atrain-json'
     this.downloadBtn.disabled = false
     this.downloadTextBtn.disabled = false
+    this.updateMediaLoadControlVisibility(parsed.sourceData)
     this.updateAutosaveStatus()
   }
 
@@ -698,8 +804,9 @@ class SubtitleEditor extends HTMLElement {
   }
 
   buildAtrainJson(cues, sourceData) {
+    const sourceIsArray = Array.isArray(sourceData)
     const cloned = structuredClone(sourceData)
-    const segments = Array.isArray(cloned) ? cloned : cloned?.segments
+    const segments = sourceIsArray ? cloned : cloned?.segments
     if (!Array.isArray(segments)) return cloned
 
     const sourceSegmentById = new Map(
@@ -747,12 +854,22 @@ class SubtitleEditor extends HTMLElement {
       return segment
     })
 
-    if (Array.isArray(cloned)) {
-      return nextSegments
+    const metadata = sourceIsArray
+      ? {}
+      : structuredClone(cloned.metadata ?? {})
+
+    metadata.media = this.mediaLoadedFromPath || metadata.media || null
+    metadata.speakers = this.getUniqueSpeakers()
+
+    if (!metadata.title) {
+      metadata.title = this.getTranscriptTitle()
     }
 
-    cloned.segments = nextSegments
-    return cloned
+    return {
+      ...(sourceIsArray ? {} : cloned),
+      metadata,
+      segments: nextSegments
+    }
   }
 
   getCueSourceSegmentIds(cue) {
@@ -766,6 +883,7 @@ class SubtitleEditor extends HTMLElement {
   refreshPreviewTrack() {
     if (!this.previewTrack) return
 
+    this.clearPreviewCueListeners()
     const vtt = this.buildVtt(this.cues)
     const nextUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
     const previousUrl = this.previewTrackUrl
@@ -785,6 +903,11 @@ class SubtitleEditor extends HTMLElement {
     this.refreshPreviewTrack()
     this.scheduleAutosave()
     this.updateAutosaveStatus()
+  }
+
+  markMediaPathChanged() {
+    if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
+    this.markDirty()
   }
 
   scheduleAutosave() {
@@ -809,11 +932,10 @@ class SubtitleEditor extends HTMLElement {
   }
 
   canAutosave() {
-    return Boolean(
-      this.loadedTranscriptPath &&
-      window.__TAURI__?.fs?.writeTextFile &&
-      ['atrain-json', 'vtt'].includes(this.loadedTranscriptFormat)
-    )
+    if (!this.loadedTranscriptPath || !window.__TAURI__?.fs?.writeTextFile) return false
+    if (this.loadedTranscriptFormat === 'vtt') return true
+    return this.loadedTranscriptFormat === 'atrain-json' &&
+      this.isCuebertJsonPath(this.loadedTranscriptPath)
   }
 
   async autosave() {
@@ -836,6 +958,7 @@ class SubtitleEditor extends HTMLElement {
       await window.__TAURI__.fs.writeTextFile(this.loadedTranscriptPath, contents)
       if (revision === this.changeRevision) {
         this.hasUnsavedChanges = false
+        this.syncLoadedTranscriptMetadata()
       } else {
         this.hasUnsavedChanges = true
         this.autosaveQueued = true
@@ -930,12 +1053,54 @@ class SubtitleEditor extends HTMLElement {
       : ''
   }
 
+  getTranscriptTitle() {
+    const metadataTitle = this.loadedTranscript?.metadata?.title
+    if (typeof metadataTitle === 'string' && metadataTitle.trim()) {
+      return metadataTitle.trim()
+    }
+
+    const fileName = this.getPathFileName(this.loadedTranscriptPath)
+    return fileName ? fileName.replace(/\.[^.]+$/, '') : 'Untitled'
+  }
+
+  getCuebertJsonDefaultPath() {
+    const sourceName = this.getPathFileName(this.loadedTranscriptPath)
+    const baseName = sourceName
+      ? sourceName.replace(/(?:\.cuebert)?\.json$/i, '').replace(/\.[^.]+$/, '')
+      : this.getTranscriptTitle()
+
+    return `${baseName || 'transcription'}.cuebert.json`
+  }
+
+  isCuebertJsonPath(path) {
+    return typeof path === 'string' && /\.cuebert\.json$/i.test(path)
+  }
+
   markSavedToPath(targetPath) {
     this.loadedTranscriptPath = targetPath
     this.hasUnsavedChanges = false
     this.changeRevision = 0
     this.lastAutosavedAt = new Date()
+    this.syncLoadedTranscriptMetadata()
+    this.updateMediaLoadControlVisibility()
     this.updateAutosaveStatus()
+  }
+
+  syncLoadedTranscriptMetadata() {
+    if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
+    if (Array.isArray(this.loadedTranscript)) {
+      this.loadedTranscript = {
+        metadata: {},
+        segments: this.loadedTranscript
+      }
+    }
+
+    this.loadedTranscript.metadata = {
+      ...(this.loadedTranscript.metadata ?? {}),
+      title: this.getTranscriptTitle(),
+      speakers: this.getUniqueSpeakers(),
+      media: this.mediaLoadedFromPath || this.loadedTranscript.metadata?.media || null
+    }
   }
 
   ensurePreviewTrackShowing() {
@@ -986,13 +1151,119 @@ class SubtitleEditor extends HTMLElement {
 
   // ---------- cue rendering ----------
 
-  setActiveCue(cue, element) {
+  setActiveCue(cue, element, options = {}) {
     this.activeCue = cue
     if (this.activeCueElement && this.activeCueElement !== element) {
       this.activeCueElement.classList.remove('is-active')
     }
     this.activeCueElement = element
     if (element) element.classList.add('is-active')
+    if (options.scroll && element) {
+      element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    }
+  }
+
+  setPlaybackCue(cue, source = 'playback') {
+    if (this.playbackCue === cue) return
+
+    const previousCue = this.playbackCue
+    if (this.playbackCueElement) {
+      this.playbackCueElement.classList.remove('is-playback-active')
+    }
+    this.playbackCueElement = null
+    this.playbackCue = cue
+    if (previousCue) {
+      this.dispatchEvent(new CustomEvent('cueend', {
+        detail: { cue: previousCue, source },
+        bubbles: true
+      }))
+    }
+    if (!cue) return
+
+    const element = this.cueElementByCue.get(cue)
+    if (!element) return
+
+    this.playbackCueElement = element
+    element.classList.add('is-playback-active')
+    this.dispatchEvent(new CustomEvent('cuestart', {
+      detail: { cue, source },
+      bubbles: true
+    }))
+    this.setActiveCue(cue, element, { scroll: true })
+  }
+
+  clearPlaybackCue(cue, source = 'playback') {
+    if (cue && this.playbackCue !== cue) return
+
+    const endedCue = this.playbackCue
+    if (this.playbackCueElement) {
+      this.playbackCueElement.classList.remove('is-playback-active')
+    }
+    this.playbackCue = null
+    this.playbackCueElement = null
+
+    if (endedCue) {
+      this.dispatchEvent(new CustomEvent('cueend', {
+        detail: { cue: endedCue, source },
+        bubbles: true
+      }))
+    }
+  }
+
+  syncActiveCueToPlayback(source = 'playback') {
+    if (!this.video || this.video.paused || this.previewEnd !== null) return
+
+    const currentCue = this.findCueAtTime(this.video.currentTime)
+    if (currentCue) {
+      this.setPlaybackCue(currentCue, source)
+    } else {
+      this.clearPlaybackCue(null, source)
+    }
+  }
+
+  findCueAtTime(time) {
+    if (!this.isFiniteNumber(time)) return null
+
+    return this.cues.find(cue =>
+      this.isFiniteNumber(cue?.start) &&
+      this.isFiniteNumber(cue?.end) &&
+      time >= cue.start &&
+      time < cue.end
+    ) ?? null
+  }
+
+  bindPreviewCueEvents() {
+    this.clearPreviewCueListeners()
+
+    const textTrack = this.previewTrack?.track
+    const trackCues = textTrack?.cues ? Array.from(textTrack.cues) : []
+    if (!trackCues.length) return
+
+    trackCues.forEach((trackCue, index) => {
+      const cue = this.cues[index]
+      if (!cue) return
+
+      const onEnter = () => {
+        if (this.previewEnd !== null) return
+        this.setPlaybackCue(cue, 'texttrack-enter')
+      }
+      const onExit = () => {
+        this.clearPlaybackCue(cue, 'texttrack-exit')
+        this.syncActiveCueToPlayback('texttrack-exit')
+      }
+
+      trackCue.addEventListener('enter', onEnter)
+      trackCue.addEventListener('exit', onExit)
+      this.previewCueListeners.push({ trackCue, onEnter, onExit })
+    })
+  }
+
+  clearPreviewCueListeners() {
+    this.previewCueListeners.forEach(({ trackCue, onEnter, onExit }) => {
+      trackCue.removeEventListener('enter', onEnter)
+      trackCue.removeEventListener('exit', onExit)
+    })
+    this.previewCueListeners = []
   }
 
   getUniqueSpeakers() {
@@ -1260,6 +1531,7 @@ class SubtitleEditor extends HTMLElement {
 
   renderCues() {
     this.cueList.innerHTML = ''
+    this.cueElementByCue = new Map()
 
     this.cues.forEach((cue, index) => {
       if (index > 0) {
@@ -1279,6 +1551,15 @@ class SubtitleEditor extends HTMLElement {
       ce.envelope = this.envelope
       ce.frameDuration = this.frameDuration
       ce.contextWindow = 0.75
+      this.cueElementByCue.set(cue, ce)
+      if (this.activeCue === cue || this.playbackCue === cue) {
+        ce.classList.add('is-active')
+        this.activeCueElement = ce
+      }
+      if (this.playbackCue === cue) {
+        ce.classList.add('is-playback-active')
+        this.playbackCueElement = ce
+      }
 
       // callbacks
       ce.onPlayCue = c => {
@@ -1356,6 +1637,8 @@ class SubtitleEditor extends HTMLElement {
 
       this.cueList.appendChild(ce)
     })
+
+    this.bindPreviewCueEvents()
   }
 
   createMergeCueRow(previousCue, nextCue) {

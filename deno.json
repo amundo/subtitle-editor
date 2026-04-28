@@ -4,6 +4,9 @@
     "dev": "deno task tauri dev",
     "build": "deno task tauri build",
     "build-debug": "deno task tauri build --debug",
-    "icons": "bash scripts/update-icons.sh"
+    "icons": "bash scripts/update-icons.sh",
+    "version": "deno run --allow-read --allow-write scripts/bump-version.js",
+    "logs": "tail -n 200 ~/Library/Logs/Cuebert/cuebert.log",
+    "logs:follow": "tail -f ~/Library/Logs/Cuebert/cuebert.log"
   }
 }
