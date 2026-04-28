@@ -11,6 +11,12 @@ class WaveForm extends HTMLElement {
     this.contextWindow = 0.75
 
     this.svg = null
+    this.visibleStart = 0
+    this.visibleEnd = 0
+    this.draggingEdge = null
+    this.dragVisibleStart = 0
+    this.dragVisibleEnd = 0
+    this.suppressNextClick = false
   }
 
   connectedCallback() {
@@ -42,6 +48,55 @@ class WaveForm extends HTMLElement {
     `
 
     this.svg = this.querySelector('.wave-form-svg')
+    this.svg.addEventListener('click', event => {
+      if (this.draggingEdge || this.suppressNextClick) {
+        event.preventDefault()
+        event.stopPropagation()
+        this.suppressNextClick = false
+        return
+      }
+      this.dispatchTimeEvent('waveformseek', this.getTimeFromPointerEvent(event))
+    })
+
+    this.svg.addEventListener('pointerdown', event => {
+      const edge = event.target?.dataset?.edge
+      if (!edge) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      this.draggingEdge = edge
+      this.dragVisibleStart = this.visibleStart
+      this.dragVisibleEnd = this.visibleEnd
+      this.svg.setPointerCapture(event.pointerId)
+      this.classList.add('is-dragging')
+      this.dispatchBoundaryEvent('waveformboundarystart', edge, this.getTimeFromPointerEvent(event))
+    })
+
+    this.svg.addEventListener('pointermove', event => {
+      if (!this.draggingEdge) return
+
+      event.preventDefault()
+      this.dispatchBoundaryEvent(
+        'waveformboundarychange',
+        this.draggingEdge,
+        this.getTimeFromPointerEvent(event)
+      )
+    })
+
+    this.svg.addEventListener('pointerup', event => {
+      event.stopPropagation()
+      this.endBoundaryDrag(event)
+    })
+
+    this.svg.addEventListener('pointercancel', event => {
+      event.stopPropagation()
+      this.endBoundaryDrag(event)
+    })
+
+    this.svg.addEventListener('lostpointercapture', () => {
+      this.draggingEdge = null
+      this.classList.remove('is-dragging')
+    })
     this.renderWaveform()
   }
 
@@ -70,6 +125,8 @@ class WaveForm extends HTMLElement {
     const tPrevEnd = start
     const tCurrEnd = end
     const tNextEnd = Math.min(duration, end + contextWindow)
+    this.visibleStart = tPrevStart
+    this.visibleEnd = tNextEnd
 
     const i0 = Math.floor(tPrevStart / fd)
     const i1 = Math.floor(tPrevEnd / fd)
@@ -134,7 +191,53 @@ class WaveForm extends HTMLElement {
       <path class="wf-prev" d="${prevPath}"></path>
       <path class="wf-current" d="${currPath}"></path>
       <path class="wf-next" d="${nextPath}"></path>
+      <line class="wf-boundary" x1="${xCurrStart.toFixed(2)}" y1="0" x2="${xCurrStart.toFixed(2)}" y2="${height}"></line>
+      <line class="wf-boundary" x1="${xCurrEnd.toFixed(2)}" y1="0" x2="${xCurrEnd.toFixed(2)}" y2="${height}"></line>
+      <rect class="wf-handle" data-edge="start" x="${Math.max(0, xCurrStart - 1.6).toFixed(2)}" y="0" width="3.2" height="${height}"></rect>
+      <rect class="wf-handle" data-edge="end" x="${Math.min(width - 3.2, xCurrEnd - 1.6).toFixed(2)}" y="0" width="3.2" height="${height}"></rect>
     `
+  }
+
+  endBoundaryDrag(event) {
+    if (!this.draggingEdge) return
+
+    event.preventDefault()
+    const edge = this.draggingEdge
+    const time = this.getTimeFromPointerEvent(event)
+    this.draggingEdge = null
+    this.suppressNextClick = true
+    this.classList.remove('is-dragging')
+
+    if (this.svg.hasPointerCapture?.(event.pointerId)) {
+      this.svg.releasePointerCapture(event.pointerId)
+    }
+
+    this.dispatchBoundaryEvent('waveformboundarycommit', edge, time)
+  }
+
+  getTimeFromPointerEvent(event) {
+    if (!this.svg) return this.start ?? 0
+
+    const rect = this.svg.getBoundingClientRect()
+    const x = Math.min(rect.width, Math.max(0, event.clientX - rect.left))
+    const ratio = rect.width ? x / rect.width : 0
+    const visibleStart = this.draggingEdge ? this.dragVisibleStart : this.visibleStart
+    const visibleEnd = this.draggingEdge ? this.dragVisibleEnd : this.visibleEnd
+    return visibleStart + ratio * (visibleEnd - visibleStart)
+  }
+
+  dispatchTimeEvent(type, time) {
+    this.dispatchEvent(new CustomEvent(type, {
+      bubbles: true,
+      detail: { time }
+    }))
+  }
+
+  dispatchBoundaryEvent(type, edge, time) {
+    this.dispatchEvent(new CustomEvent(type, {
+      bubbles: true,
+      detail: { edge, time }
+    }))
   }
 }
 

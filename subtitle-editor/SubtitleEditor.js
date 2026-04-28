@@ -1048,6 +1048,51 @@ class SubtitleEditor extends HTMLElement {
     this.markDirty()
   }
 
+  setCueBoundary(cue, edge, time) {
+    const minCueDuration = 0.05
+    const mediaDuration = this.getMediaDuration()
+    const maxTime = mediaDuration || Math.max(cue.end, time, 0)
+
+    if (edge === 'start') {
+      cue.start = this.clamp(time, 0, Math.max(0, cue.end - minCueDuration))
+      return 'start'
+    }
+
+    cue.end = this.clamp(time, cue.start + minCueDuration, maxTime)
+    return 'end'
+  }
+
+  playBoundaryPreview(cue, edge) {
+    const previewDuration = 0.75
+
+    if (edge === 'start') {
+      this.playTimeRange(cue.start, Math.min(cue.end, cue.start + previewDuration))
+      return
+    }
+
+    this.playTimeRange(Math.max(cue.start, cue.end - previewDuration), cue.end)
+  }
+
+  playTimeRange(start, end) {
+    if (!this.video || !this.video.src) return
+
+    this.previewEnd = Math.max(start, end)
+    this.video.currentTime = Math.max(0, start)
+    this.updateTransportUi()
+    this.video.play().catch(err => {
+      console.error('Media playback failed:', err)
+    })
+  }
+
+  getMediaDuration() {
+    return Number.isFinite(this.video?.duration) ? this.video.duration : 0
+  }
+
+  clamp(value, min, max) {
+    const numericValue = Number.isFinite(value) ? value : min
+    return Math.min(max, Math.max(min, numericValue))
+  }
+
   getCueSplitTime(cue) {
     const currentTime = this.video?.currentTime
     if (
@@ -1184,9 +1229,7 @@ class SubtitleEditor extends HTMLElement {
 
       // callbacks
       ce.onPlayCue = c => {
-        this.previewEnd = c.end
-        this.video.currentTime = c.start
-        this.video.play()
+        this.playTimeRange(c.start, c.end)
       }
 
       ce.onSnapStartToNow = () => {
@@ -1225,6 +1268,27 @@ class SubtitleEditor extends HTMLElement {
 
       ce.onDeleteCue = () => {
         this.deleteCue(cue)
+      }
+
+      ce.onWaveformSeek = time => {
+        this.setActiveCue(cue, ce)
+        this.video.currentTime = this.clamp(time, 0, this.getMediaDuration())
+        this.updateTransportUi()
+      }
+
+      ce.onWaveformBoundaryChange = ({ edge, time }) => {
+        this.setCueBoundary(cue, edge, time)
+        ce.updateTimeLabels()
+        ce.renderWaveform()
+        this.updateTransportUi()
+      }
+
+      ce.onWaveformBoundaryCommit = ({ edge, time }) => {
+        const nextEdge = this.setCueBoundary(cue, edge, time)
+        ce.updateTimeLabels()
+        ce.renderWaveform()
+        this.playBoundaryPreview(cue, nextEdge)
+        this.markDirty()
       }
 
       ce.addEventListener('focusin', () => {

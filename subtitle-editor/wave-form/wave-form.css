@@ -10,6 +10,8 @@ wave-form .wave-form-svg {
   width: 100%;
   height: 40px;
   display: block;
+  cursor: crosshair;
+  touch-action: none;
 }
 
 wave-form path {
@@ -25,4 +27,21 @@ wave-form .wf-next {
 wave-form .wf-current {
   fill: #4daaaa;
   opacity: 1;
+}
+
+wave-form .wf-boundary {
+  stroke: #155e63;
+  stroke-width: 0.5;
+  vector-effect: non-scaling-stroke;
+}
+
+wave-form .wf-handle {
+  fill: transparent;
+  cursor: ew-resize;
+  pointer-events: all;
+}
+
+wave-form .wf-handle:hover,
+wave-form.is-dragging .wf-handle {
+  fill: rgb(21 94 99 / 0.16);
 }

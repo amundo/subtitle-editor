@@ -23,6 +23,9 @@ class CueEditor extends HTMLElement {
     this.onSetSpeaker = null
     this.onSplitCue = null
     this.onDeleteCue = null
+    this.onWaveformSeek = null
+    this.onWaveformBoundaryChange = null
+    this.onWaveformBoundaryCommit = null
   }
 
   connectedCallback() {
@@ -192,6 +195,24 @@ class CueEditor extends HTMLElement {
     if (this.speakerPill) {
       this.speakerPill.addEventListener('click', () => {
         if (this.onSetSpeaker) this.onSetSpeaker(this.getNextSpeaker())
+      })
+    }
+
+    if (this.waveForm) {
+      this.waveForm.addEventListener('waveformseek', event => {
+        if (this.onWaveformSeek) this.onWaveformSeek(event.detail.time)
+      })
+
+      this.waveForm.addEventListener('waveformboundarychange', event => {
+        if (this.onWaveformBoundaryChange) {
+          this.onWaveformBoundaryChange(event.detail)
+        }
+      })
+
+      this.waveForm.addEventListener('waveformboundarycommit', event => {
+        if (this.onWaveformBoundaryCommit) {
+          this.onWaveformBoundaryCommit(event.detail)
+        }
       })
     }
 
