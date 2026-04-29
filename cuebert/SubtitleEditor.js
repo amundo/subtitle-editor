@@ -1,5 +1,6 @@
 // SubtitleEditor.js
 import './cue-editor/CueEditor.js'
+import {formatTime, parseTime} from './services/time.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -383,11 +384,11 @@ class SubtitleEditor extends HTMLElement {
     const currentTime = Number.isFinite(this.video.currentTime) ? this.video.currentTime : 0
 
     if (this.currentTimeLabel) {
-      this.currentTimeLabel.textContent = this.formatTime(currentTime)
+      this.currentTimeLabel.textContent = formatTime(currentTime)
     }
 
     if (this.durationTimeLabel) {
-      this.durationTimeLabel.textContent = this.formatTime(duration)
+      this.durationTimeLabel.textContent = formatTime(duration)
     }
 
     if (this.mediaSeek) {
@@ -504,21 +505,9 @@ class SubtitleEditor extends HTMLElement {
 
   // ---------- time helpers ----------
 
-  formatTime(seconds) {
-    const s = Math.max(0, seconds)
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = (s % 60).toFixed(3)
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(
-      sec
-    ).padStart(6, '0')}`
-  }
 
-  parseTime(str) {
-    const m = str.match(/(\d+):(\d+):(\d+\.\d+)/)
-    if (!m) return 0
-    return +m[1] * 3600 + +m[2] * 60 + +m[3]
-  }
+
+
 
   canUseNativeTranscriptPicker() {
     return Boolean(window.__TAURI__?.dialog?.open && window.__TAURI__?.fs?.readTextFile)
@@ -744,8 +733,8 @@ class SubtitleEditor extends HTMLElement {
       const m = timeLine.match(/([\d:.]+)\s*-->\s*([\d:.]+)/)
       if (!m) continue
 
-      const start = this.parseTime(m[1])
-      const end = this.parseTime(m[2])
+      const start = parseTime(m[1])
+      const end = parseTime(m[2])
 
       const textLines = []
       while (i < lines.length && lines[i].trim() !== '') {
@@ -762,7 +751,7 @@ class SubtitleEditor extends HTMLElement {
     for (const cue of cues) {
       parts.push(String(cue.id))
       parts.push(
-        `${this.formatTime(cue.start)} --> ${this.formatTime(cue.end)}`
+        `${formatTime(cue.start)} --> ${formatTime(cue.end)}`
       )
       parts.push(this.formatCueTextForExport(cue))
       parts.push('')
@@ -1544,7 +1533,7 @@ class SubtitleEditor extends HTMLElement {
       const ce = document.createElement('cue-editor')
       ce.data = cue
       ce.video = this.video
-      ce.formatTime = this.formatTime.bind(this)
+      ce.formatTime = formatTime.bind(this)
       ce.speakerOptions = this.getUniqueSpeakers()
 
       // waveform props (will be null until analysis is ready)
