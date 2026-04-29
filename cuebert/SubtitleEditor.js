@@ -1648,7 +1648,8 @@ class SubtitleEditor extends HTMLElement {
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'cue-merge-button'
-    button.textContent = 'Merge cues'
+    button.textContent = '▲ merge ▼'
+    
     button.title = 'Merge the cue above with the cue below'
     button.addEventListener('click', () => {
       this.mergeCues(previousCue, nextCue)
