@@ -2,18 +2,9 @@
 import './cue-editor/CueEditor.js'
 import './cue-list-view/CueListView.js'
 import { formatTime, parseTime } from './services/time.js'
-import {
-  parseSubtitleFile,
-  parseVtt,
-  parseAtrainJson
-} from './services/TranscriptParser.js'
-import {
-  buildVtt,
-  buildPlainText,
-  buildAtrainJson
-} from './services/TranscriptExporter.js'
 import { AutosaveController } from './services/AutosaveController.js'
 import { SpeakerController } from './services/SpeakerController.js'
+import { TranscriptDocument } from './services/TranscriptDocument.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -53,6 +44,7 @@ class SubtitleEditor extends HTMLElement {
     this.lastAutosaveDiagnosticSignature = ''
     this.autosaveController = new AutosaveController()
     this.speakerController = new SpeakerController()
+    this.transcriptDocument = new TranscriptDocument()
 
     // audio analysis state
     this.audioBuffer = null
@@ -318,7 +310,7 @@ class SubtitleEditor extends HTMLElement {
       this.saveTextOutput({
         defaultPath: 'adjusted-subtitles.vtt',
         filters: [{ name: 'WebVTT', extensions: ['vtt'] }],
-        contents: buildVtt(this.cues),
+        contents: this.transcriptDocument.buildVttContents(this.cues),
         mimeType: 'text/vtt'
       }).then(targetPath => {
         if (targetPath && this.loadedTranscriptFormat === 'vtt') {
@@ -330,11 +322,16 @@ class SubtitleEditor extends HTMLElement {
     this.saveBtn.addEventListener('click', () => {
       if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
 
-      const json = buildAtrainJson(this.cues, this.loadedTranscript)
       this.saveTextOutput({
         defaultPath: this.getCuebertJsonDefaultPath(),
         filters: [{ name: 'JSON', extensions: ['json'] }],
-        contents: JSON.stringify(json, null, 2),
+        contents: this.transcriptDocument.buildCuebertJsonContents({
+          cues: this.cues,
+          sourceData: this.loadedTranscript,
+          mediaPath: this.mediaLoadedFromPath,
+          speakers: this.getUniqueSpeakers(),
+          title: this.getTranscriptTitle()
+        }),
         mimeType: 'application/json'
       }).then(targetPath => {
         if (targetPath) {
@@ -347,7 +344,7 @@ class SubtitleEditor extends HTMLElement {
       this.saveTextOutput({
         defaultPath: 'transcript.txt',
         filters: [{ name: 'Text', extensions: ['txt'] }],
-        contents: buildPlainText(this.cues),
+        contents: this.transcriptDocument.buildPlainTextContents(this.cues),
         mimeType: 'text/plain'
       })
     })
@@ -675,11 +672,11 @@ class SubtitleEditor extends HTMLElement {
   }
 
   loadTranscriptText(text, { fileName = '', sourcePath = null } = {}) {
-    const parsed = parseSubtitleFile(text, fileName)
-    this.cues = parsed.cues
-    this.loadedTranscript = parsed.sourceData
-    this.loadedTranscriptFormat = parsed.format
-    this.loadedTranscriptPath = sourcePath
+    const document = this.transcriptDocument.parseText(text, { fileName, sourcePath })
+    this.cues = document.cues
+    this.loadedTranscript = document.sourceData
+    this.loadedTranscriptFormat = document.format
+    this.loadedTranscriptPath = document.path
     this.manualSpeakers = []
     this.hasUnsavedChanges = false
     this.changeRevision = 0
@@ -687,18 +684,18 @@ class SubtitleEditor extends HTMLElement {
     this.renderSpeakerEditor()
     this.renderCues()
     this.refreshPreviewTrack()
-    this.loadMediaForTranscript(sourcePath, parsed.sourceData).catch(err => {
+    this.loadMediaForTranscript(sourcePath, document.sourceData).catch(err => {
       console.warn('Transcript media load failed:', err)
     })
-    this.saveBtn.disabled = parsed.format !== 'atrain-json'
+    this.saveBtn.disabled = document.format !== 'atrain-json'
     this.downloadBtn.disabled = false
     this.downloadTextBtn.disabled = false
-    this.updateMediaLoadControlVisibility(parsed.sourceData)
+    this.updateMediaLoadControlVisibility(document.sourceData)
     window.cuebertLog?.('info', 'loaded-transcript', {
       fileName,
       sourcePath,
-      format: parsed.format,
-      cueCount: parsed.cues.length,
+      format: document.format,
+      cueCount: document.cues.length,
       autosave: this.getAutosaveAvailability()
     })
     this.updateAutosaveStatus()
@@ -708,7 +705,7 @@ class SubtitleEditor extends HTMLElement {
     if (!this.previewTrack) return
 
     this.clearPreviewCueListeners()
-    const vtt = buildVtt(this.cues)
+    const vtt = this.transcriptDocument.buildVttContents(this.cues)
     const nextUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
     const previousUrl = this.previewTrackUrl
 
@@ -860,20 +857,14 @@ class SubtitleEditor extends HTMLElement {
   }
 
   buildLoadedTranscriptContents() {
-    if (this.loadedTranscriptFormat === 'atrain-json') {
-      const json = buildAtrainJson(this.cues, this.loadedTranscript, {
-        mediaPath: this.mediaLoadedFromPath,
-        speakers: this.getUniqueSpeakers(),
-        title: this.getTranscriptTitle()
-      })
-      return `${JSON.stringify(json, null, 2)}\n`
-    }
-
-    if (this.loadedTranscriptFormat === 'vtt') {
-      return buildVtt(this.cues)
-    }
-
-    throw new Error(`Autosave is not available for ${this.loadedTranscriptFormat}`)
+    return this.transcriptDocument.buildContents({
+      format: this.loadedTranscriptFormat,
+      cues: this.cues,
+      sourceData: this.loadedTranscript,
+      mediaPath: this.mediaLoadedFromPath,
+      speakers: this.getUniqueSpeakers(),
+      title: this.getTranscriptTitle()
+    })
   }
 
   updateAutosaveStatus(message = null) {
@@ -944,13 +935,11 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getTranscriptTitle() {
-    const metadataTitle = this.loadedTranscript?.metadata?.title
-    if (typeof metadataTitle === 'string' && metadataTitle.trim()) {
-      return metadataTitle.trim()
-    }
-
-    const fileName = this.getPathFileName(this.loadedTranscriptPath)
-    return fileName ? fileName.replace(/\.[^.]+$/, '') : 'Untitled'
+    return this.transcriptDocument.getTranscriptTitle({
+      sourceData: this.loadedTranscript,
+      path: this.loadedTranscriptPath,
+      getPathFileName: path => this.getPathFileName(path)
+    })
   }
 
   getCuebertJsonDefaultPath() {
@@ -978,20 +967,13 @@ class SubtitleEditor extends HTMLElement {
   }
 
   syncLoadedTranscriptMetadata() {
-    if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
-    if (Array.isArray(this.loadedTranscript)) {
-      this.loadedTranscript = {
-        metadata: {},
-        segments: this.loadedTranscript
-      }
-    }
-
-    this.loadedTranscript.metadata = {
-      ...(this.loadedTranscript.metadata ?? {}),
-      title: this.getTranscriptTitle(),
+    this.loadedTranscript = this.transcriptDocument.syncMetadata({
+      format: this.loadedTranscriptFormat,
+      sourceData: this.loadedTranscript,
+      mediaPath: this.mediaLoadedFromPath,
       speakers: this.getUniqueSpeakers(),
-      media: this.mediaLoadedFromPath || this.loadedTranscript.metadata?.media || null
-    }
+      title: this.getTranscriptTitle()
+    })
   }
 
   ensurePreviewTrackShowing() {
