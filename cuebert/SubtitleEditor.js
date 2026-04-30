@@ -5,6 +5,7 @@ import { formatTime, parseTime } from './services/time.js'
 import { AutosaveController } from './services/AutosaveController.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
+import { TransportController } from './services/TransportController.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -146,7 +147,7 @@ class SubtitleEditor extends HTMLElement {
               <span class="time-divider">/</span>
               <span data-role="durationTime" class="time-label">00:00:00.000</span>
             </div>
-            <button data-role="mediaMuteBtn" class="transport-button" type="button" aria-label="Mute">${this.renderVolumeIcon(false)}</button>
+            <button data-role="mediaMuteBtn" class="transport-button" type="button" aria-label="Mute">${TransportController.renderVolumeIcon(false)}</button>
             <input
               data-role="mediaVolume"
               class="media-volume"
@@ -218,48 +219,37 @@ class SubtitleEditor extends HTMLElement {
 
 
   bindEvents() {
-    this.bindVideoEvents()
+    this.transportController = new TransportController({
+      video: this.video,
+      previewTrack: this.previewTrack,
+      controls: {
+        currentTimeLabel: this.currentTimeLabel,
+        durationTimeLabel: this.durationTimeLabel,
+        mediaSeek: this.mediaSeek,
+        mediaPlayBtn: this.mediaPlayBtn,
+        mediaMuteBtn: this.mediaMuteBtn,
+        mediaVolume: this.mediaVolume
+      },
+      getPreviewEnd: () => this.previewEnd,
+      setPreviewEnd: previewEnd => {
+        this.previewEnd = previewEnd
+      },
+      onPlaybackSync: source => {
+        this.syncActiveCueToPlayback(source)
+      },
+      onPreviewTrackLoad: () => {
+        this.ensurePreviewTrackShowing()
+        this.bindPreviewCueEvents()
+      }
+    })
+    this.transportController.bindVideoEvents()
     this.bindFileEvents()
     this.bindExportEvents()
     this.bindSpeakerEvents()
-    this.bindTransportControls()
+    this.transportController.bindTransportControls()
     this.bindPreferenceEvents()
 
-    this.updateTransportUi()
-  }
-
-  bindVideoEvents() {
-    this.video.addEventListener('timeupdate', () => {
-      this.updateTransportUi()
-      this.syncActiveCueToPlayback('timeupdate')
-      if (this.previewEnd !== null && this.video.currentTime >= this.previewEnd) {
-        this.video.pause()
-        this.previewEnd = null
-      }
-    })
-
-    this.video.addEventListener('loadedmetadata', () => {
-      this.updateTransportUi()
-    })
-
-    this.video.addEventListener('durationchange', () => {
-      this.updateTransportUi()
-    })
-
-    this.video.addEventListener('play', () => {
-      this.updateTransportUi()
-      this.syncActiveCueToPlayback('play')
-    })
-
-    this.video.addEventListener('pause', () => {
-      this.updateTransportUi()
-    })
-
-    this.previewTrack?.addEventListener('load', () => {
-      this.ensurePreviewTrackShowing()
-      this.bindPreviewCueEvents()
-      this.syncActiveCueToPlayback('trackload')
-    })
+    this.transportController.updateUi()
   }
 
   bindFileEvents() {
@@ -269,7 +259,7 @@ class SubtitleEditor extends HTMLElement {
       this.mediaLoadedFromPath = this.getFilePath(file)
       this.autoLoadedMediaPath = null
       this.video.src = URL.createObjectURL(file)
-      this.updateTransportUi()
+      this.transportController.updateUi()
       this.ensurePreviewTrackShowing()
       // kick off async audio analysis
       this.initAudioAnalysis(file).catch(err => {
@@ -365,42 +355,6 @@ class SubtitleEditor extends HTMLElement {
     })
 
   }
-  bindTransportControls() {
-
-    this.mediaPlayBtn?.addEventListener('click', () => {
-      if (!this.video.src) return
-      if (this.video.paused) {
-        this.video.play().catch(err => {
-          console.error('Media playback failed:', err)
-        })
-      } else {
-        this.video.pause()
-      }
-    })
-
-    this.mediaSeek?.addEventListener('input', () => {
-      const nextTime = Number(this.mediaSeek.value)
-      if (Number.isFinite(nextTime)) {
-        this.video.currentTime = nextTime
-        this.updateTransportUi()
-      }
-    })
-
-    this.mediaMuteBtn?.addEventListener('click', () => {
-      this.video.muted = !this.video.muted
-      this.updateTransportUi()
-    })
-
-    this.mediaVolume?.addEventListener('input', () => {
-      const nextVolume = Number(this.mediaVolume.value)
-      if (!Number.isFinite(nextVolume)) return
-
-      this.video.volume = Math.min(1, Math.max(0, nextVolume))
-      this.video.muted = this.video.volume === 0
-      this.updateTransportUi()
-    })
-
-  }
   bindPreferenceEvents() {
     this.autosaveToggle?.addEventListener('change', () => {
       this.autosaveEnabled = this.autosaveToggle.checked
@@ -432,55 +386,6 @@ class SubtitleEditor extends HTMLElement {
 
     this.cueFontSizeEm = Math.round(nextSize * 10) / 10
     document.documentElement.style.setProperty('--cue-font-size', `${this.cueFontSizeEm}em`)
-  }
-
-  updateTransportUi() {
-    if (!this.video) return
-
-    const duration = Number.isFinite(this.video.duration) ? this.video.duration : 0
-    const currentTime = Number.isFinite(this.video.currentTime) ? this.video.currentTime : 0
-
-    if (this.currentTimeLabel) {
-      this.currentTimeLabel.textContent = formatTime(currentTime)
-    }
-
-    if (this.durationTimeLabel) {
-      this.durationTimeLabel.textContent = formatTime(duration)
-    }
-
-    if (this.mediaSeek) {
-      this.mediaSeek.max = String(duration)
-      this.mediaSeek.value = String(Math.min(currentTime, duration || currentTime))
-      this.mediaSeek.disabled = duration === 0
-    }
-
-    if (this.mediaPlayBtn) {
-      this.mediaPlayBtn.textContent = this.video.paused ? '▶' : '❚❚'
-      this.mediaPlayBtn.disabled = !this.video.src
-      this.mediaPlayBtn.setAttribute('aria-label', this.video.paused ? 'Play' : 'Pause')
-    }
-
-    if (this.mediaMuteBtn) {
-      this.mediaMuteBtn.innerHTML = this.renderVolumeIcon(this.video.muted || this.video.volume === 0)
-      this.mediaMuteBtn.setAttribute('aria-label', this.video.muted ? 'Unmute' : 'Mute')
-    }
-
-    if (this.mediaVolume) {
-      this.mediaVolume.value = String(this.video.muted ? 0 : this.video.volume)
-    }
-  }
-
-  renderVolumeIcon(muted) {
-    const waves = muted
-      ? '<line x1="18" y1="9" x2="23" y2="14"></line><line x1="23" y1="9" x2="18" y2="14"></line>'
-      : '<path d="M18 9a5 5 0 0 1 0 6"></path><path d="M21 6a9 9 0 0 1 0 12"></path>'
-
-    return `
-      <svg class="transport-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
-        ${waves}
-      </svg>
-    `
   }
 
   // ---------- audio analysis ----------
@@ -642,12 +547,12 @@ class SubtitleEditor extends HTMLElement {
       blob = await response.blob()
     } catch (err) {
       this.video.removeAttribute('src')
-      this.updateTransportUi()
+      this.transportController.updateUi()
       throw err
     }
 
     this.video.src = mediaUrl
-    this.updateTransportUi()
+    this.transportController.updateUi()
     this.ensurePreviewTrackShowing()
 
     try {
@@ -1169,7 +1074,7 @@ class SubtitleEditor extends HTMLElement {
 
   setCueBoundary(cue, edge, time) {
     const minCueDuration = 0.05
-    const mediaDuration = this.getMediaDuration()
+    const mediaDuration = this.transportController.getMediaDuration()
     const maxTime = mediaDuration || Math.max(cue.end, time, 0)
 
     if (edge === 'start') {
@@ -1179,32 +1084,6 @@ class SubtitleEditor extends HTMLElement {
 
     cue.end = this.clamp(time, cue.start + minCueDuration, maxTime)
     return 'end'
-  }
-
-  playBoundaryPreview(cue, edge) {
-    const previewDuration = 0.75
-
-    if (edge === 'start') {
-      this.playTimeRange(cue.start, Math.min(cue.end, cue.start + previewDuration))
-      return
-    }
-
-    this.playTimeRange(Math.max(cue.start, cue.end - previewDuration), cue.end)
-  }
-
-  playTimeRange(start, end) {
-    if (!this.video || !this.video.src) return
-
-    this.previewEnd = Math.max(start, end)
-    this.video.currentTime = Math.max(0, start)
-    this.updateTransportUi()
-    this.video.play().catch(err => {
-      console.error('Media playback failed:', err)
-    })
-  }
-
-  getMediaDuration() {
-    return Number.isFinite(this.video?.duration) ? this.video.duration : 0
   }
 
   clamp(value, min, max) {
@@ -1338,7 +1217,7 @@ class SubtitleEditor extends HTMLElement {
       formatTime,
       handlers: {
         onPlayCue: cue => {
-          this.playTimeRange(cue.start, cue.end)
+          this.transportController.playTimeRange(cue.start, cue.end)
         },
         onSnapStartToNow: cue => {
           cue.start = this.video.currentTime
@@ -1369,20 +1248,24 @@ class SubtitleEditor extends HTMLElement {
         },
         onWaveformSeek: (cue, time, cueEditor) => {
           this.setActiveCue(cue, cueEditor)
-          this.video.currentTime = this.clamp(time, 0, this.getMediaDuration())
-          this.updateTransportUi()
+          this.video.currentTime = this.clamp(
+            time,
+            0,
+            this.transportController.getMediaDuration()
+          )
+          this.transportController.updateUi()
         },
         onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
           this.setCueBoundary(cue, edge, time)
           cueEditor.updateTimeLabels()
           cueEditor.renderWaveform()
-          this.updateTransportUi()
+          this.transportController.updateUi()
         },
         onWaveformBoundaryCommit: (cue, { edge, time }, cueEditor) => {
           const nextEdge = this.setCueBoundary(cue, edge, time)
           cueEditor.updateTimeLabels()
           cueEditor.renderWaveform()
-          this.playBoundaryPreview(cue, nextEdge)
+          this.transportController.playBoundaryPreview(cue, nextEdge)
           this.markDirty()
         },
         onFocusCue: (cue, cueEditor) => {

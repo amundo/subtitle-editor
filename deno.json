@@ -65,6 +65,11 @@
       "command": "tail -f ~/Library/Logs/Cuebert/cuebert.log"
     },
 
+    "context:zip": {
+      "description": "Create a slim zip of source/config files for AI handoff",
+      "command": "deno run -A compress.js"
+    },
+
     "run:dev": {
       "description": "Run Deno frontend script directly (non-Tauri dev mode)",
       "command": "deno run -A src/main"
