@@ -12,6 +12,8 @@ import {
   buildPlainText,
   buildAtrainJson
 } from './services/TranscriptExporter.js'
+import { AutosaveController } from './services/AutosaveController.js'
+import { SpeakerController } from './services/SpeakerController.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -49,6 +51,8 @@ class SubtitleEditor extends HTMLElement {
     this.changeRevision = 0
     this.lastAutosavedAt = null
     this.lastAutosaveDiagnosticSignature = ''
+    this.autosaveController = new AutosaveController()
+    this.speakerController = new SpeakerController()
 
     // audio analysis state
     this.audioBuffer = null
@@ -761,48 +765,21 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getAutosaveAvailability() {
-    const hasWriteTextFile = Boolean(window.__TAURI__?.fs?.writeTextFile)
-    const hasTranscriptAutosaveCommand = Boolean(window.__TAURI__?.core?.invoke)
-    const hasTranscriptPath = Boolean(this.loadedTranscriptPath)
-    const isCuebertJson = this.isCuebertJsonPath(this.loadedTranscriptPath)
-    const targetPath = this.getAutosaveTargetPath()
-    let reason = 'available'
-
-    if (!hasTranscriptPath) {
-      reason = 'missing-loadedTranscriptPath'
-    } else if (!targetPath) {
-      reason = 'unsupported-format'
-    } else if (!this.hasAutosaveWriterForTarget(targetPath)) {
-      reason = 'missing-transcript-autosave-command'
-    }
-
-    return {
-      available: reason === 'available',
-      reason,
+    return this.autosaveController.getAvailability({
       loadedTranscriptPath: this.loadedTranscriptPath,
-      loadedTranscriptFormat: this.loadedTranscriptFormat,
-      hasWriteTextFile,
-      hasTranscriptAutosaveCommand,
-      isCuebertJson,
-      targetPath,
-      willCreateCuebertJson: this.loadedTranscriptFormat === 'atrain-json' &&
-        Boolean(targetPath) &&
-        targetPath !== this.loadedTranscriptPath
-    }
+      loadedTranscriptFormat: this.loadedTranscriptFormat
+    })
   }
 
   hasAutosaveWriterForTarget(targetPath) {
-    if (!targetPath) return false
-    return Boolean(window.__TAURI__?.core?.invoke)
+    return this.autosaveController.hasWriterForTarget(targetPath)
   }
 
   getAutosaveTargetPath() {
-    if (!this.loadedTranscriptPath) return null
-    if (this.loadedTranscriptFormat === 'vtt') return this.loadedTranscriptPath
-    if (this.loadedTranscriptFormat !== 'atrain-json') return null
-    if (this.isCuebertJsonPath(this.loadedTranscriptPath)) return this.loadedTranscriptPath
-
-    return this.getCuebertJsonPathForSource(this.loadedTranscriptPath)
+    return this.autosaveController.getTargetPath({
+      loadedTranscriptPath: this.loadedTranscriptPath,
+      loadedTranscriptFormat: this.loadedTranscriptFormat
+    })
   }
 
   canAutosave() {
@@ -875,7 +852,7 @@ class SubtitleEditor extends HTMLElement {
   }
 
   async writeAutosaveContents(targetPath, contents) {
-    await window.__TAURI__.core.invoke('write_transcript_autosave', {
+    await this.autosaveController.writeContents({
       sourcePath: this.loadedTranscriptPath,
       targetPath,
       contents
@@ -955,10 +932,7 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getAutosaveUnavailableMessage(autosave) {
-    if (!autosave.hasTranscriptAutosaveCommand) return 'Autosave desktop only'
-    if (!autosave.loadedTranscriptPath) return 'Open from disk to autosave'
-
-    return 'Autosave unavailable'
+    return this.autosaveController.getUnavailableMessage(autosave)
   }
 
   getFilePath(file) {
@@ -966,22 +940,7 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getPathFileName(path) {
-    return typeof path === 'string'
-      ? path.split(/[\\/]/).pop() || ''
-      : ''
-  }
-
-  getPathDirectory(path) {
-    if (typeof path !== 'string') return ''
-
-    const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
-    return index === -1 ? '' : path.slice(0, index)
-  }
-
-  joinPath(directory, fileName) {
-    if (!directory) return fileName
-    const separator = directory.includes('\\') ? '\\' : '/'
-    return `${directory}${separator}${fileName}`
+    return this.autosaveController.getPathFileName(path)
   }
 
   getTranscriptTitle() {
@@ -995,25 +954,17 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getCuebertJsonDefaultPath() {
-    return this.getCuebertJsonFileNameForSource(this.loadedTranscriptPath)
+    return this.getCuebertJsonFileNameForSource(
+      this.loadedTranscriptPath,
+      this.getTranscriptTitle()
+    )
   }
 
-  getCuebertJsonFileNameForSource(sourcePath) {
-    const sourceName = this.getPathFileName(sourcePath)
-    const baseName = sourceName
-      ? sourceName.replace(/(?:\.cuebert)?\.json$/i, '').replace(/\.[^.]+$/, '')
-      : this.getTranscriptTitle()
-
-    return `${baseName || 'transcription'}.cuebert.json`
-  }
-
-  getCuebertJsonPathForSource(sourcePath) {
-    const directory = this.getPathDirectory(sourcePath)
-    return this.joinPath(directory, this.getCuebertJsonFileNameForSource(sourcePath))
-  }
-
-  isCuebertJsonPath(path) {
-    return typeof path === 'string' && /\.cuebert\.json$/i.test(path)
+  getCuebertJsonFileNameForSource(sourcePath, fallbackTitle = this.getTranscriptTitle()) {
+    return this.autosaveController.getCuebertJsonFileNameForSource(
+      sourcePath,
+      fallbackTitle
+    )
   }
 
   markSavedToPath(targetPath) {
@@ -1207,35 +1158,28 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getUniqueSpeakers() {
-    return [...new Set(
-      [...this.manualSpeakers, ...this.cues
-        .map(cue => (typeof cue.speaker === 'string' ? cue.speaker.trim() : ''))
-        .filter(Boolean)]
-    )]
+    return this.speakerController.getUniqueSpeakers({
+      manualSpeakers: this.manualSpeakers,
+      cues: this.cues
+    })
   }
 
   renameSpeaker(fromSpeaker, toSpeaker) {
-    const from = typeof fromSpeaker === 'string' ? fromSpeaker.trim() : ''
-    const to = typeof toSpeaker === 'string' ? toSpeaker.trim() : ''
-    if (!from || !to || from === to) return
-
-    this.manualSpeakers = this.manualSpeakers.map(speaker =>
-      speaker === from ? to : speaker
-    )
-    this.manualSpeakers = [...new Set(this.manualSpeakers)]
-
-    this.cues.forEach(cue => {
-      if (cue.speaker === from) {
-        cue.speaker = to
-      }
+    const result = this.speakerController.renameSpeaker({
+      manualSpeakers: this.manualSpeakers,
+      cues: this.cues,
+      fromSpeaker,
+      toSpeaker
     })
+    if (!result.changed) return
 
+    this.manualSpeakers = result.manualSpeakers
     this.afterCueChange()
   }
 
   setCueSpeaker(cue, speaker) {
-    const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
-    cue.speaker = nextSpeaker || null
+    if (!this.speakerController.setCueSpeaker(cue, speaker)) return
+
     this.afterCueChange()
   }
 
@@ -1345,12 +1289,14 @@ class SubtitleEditor extends HTMLElement {
   }
 
   addSpeaker(speaker) {
-    const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
-    if (!nextSpeaker) return
+    if (!this.speakerController.normalizeSpeaker(speaker)) return
 
-    if (!this.getUniqueSpeakers().includes(nextSpeaker)) {
-      this.manualSpeakers.push(nextSpeaker)
-    }
+    const result = this.speakerController.addSpeaker({
+      manualSpeakers: this.manualSpeakers,
+      cues: this.cues,
+      speaker
+    })
+    this.manualSpeakers = result.manualSpeakers
 
     if (this.addSpeakerInput) this.addSpeakerInput.value = ''
     this.renderSpeakerEditor()

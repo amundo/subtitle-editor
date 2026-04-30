@@ -1,12 +1,73 @@
 {
   "tasks": {
-    "tauri": "deno run -A npm:@tauri-apps/cli@2",
-    "dev": "deno task tauri dev",
-    "build": "deno task tauri build",
-    "build-debug": "deno task tauri build --debug",
-    "icons": "bash scripts/update-icons.sh",
-    "version": "deno run --allow-read --allow-write scripts/bump-version.js",
-    "logs": "tail -n 200 ~/Library/Logs/Cuebert/cuebert.log",
-    "logs:follow": "tail -f ~/Library/Logs/Cuebert/cuebert.log"
+    "tauri": {
+      "description": "Run Tauri CLI via Deno (no Node install required)",
+      "command": "deno run -A npm:@tauri-apps/cli@2"
+    },
+
+    "dev": {
+      "description": "Start Tauri in development mode (hot reload, fast iteration)",
+      "command": "deno task tauri dev"
+    },
+
+    "build": {
+      "description": "Build production Tauri app bundle",
+      "command": "deno task tauri build"
+    },
+
+    "build-debug": {
+      "description": "Build debug version of Tauri app",
+      "command": "deno task tauri build --debug"
+    },
+
+    "run:binary": {
+      "description": "Run built app binary directly (fast, shows logs in terminal)",
+      "command": "./src-tauri/target/release/bundle/macos/Cuebert.app/Contents/MacOS/cuebert"
+    },
+
+    "run:app": {
+      "description": "Open built .app via Finder (simulates real user launch)",
+      "command": "open ./src-tauri/target/release/bundle/macos/Cuebert.app"
+    },
+
+    "run:dmg": {
+      "description": "Open the generated DMG installer",
+      "command": "open ./src-tauri/target/release/bundle/dmg"
+    },
+
+    "test:binary": {
+      "description": "Build app and run binary with terminal logs",
+      "command": "deno task build && deno task run:binary"
+    },
+
+    "test:app": {
+      "description": "Build app and open it like a user would",
+      "command": "deno task build && deno task run:app"
+    },
+
+    "icons": {
+      "description": "Regenerate app icons",
+      "command": "bash scripts/update-icons.sh"
+    },
+
+    "version": {
+      "description": "Bump app version in config files",
+      "command": "deno run --allow-read --allow-write scripts/bump-version.js"
+    },
+
+    "logs": {
+      "description": "Show last 200 lines of app log file",
+      "command": "tail -n 200 ~/Library/Logs/Cuebert/cuebert.log"
+    },
+
+    "logs:follow": {
+      "description": "Follow app log file in real time",
+      "command": "tail -f ~/Library/Logs/Cuebert/cuebert.log"
+    },
+
+    "run:dev": {
+      "description": "Run Deno frontend script directly (non-Tauri dev mode)",
+      "command": "deno run -A src/main"
+    }
   }
 }
