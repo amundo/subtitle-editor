@@ -1,9 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
-    fs::{create_dir_all, OpenOptions},
+    fs::{create_dir_all, write, OpenOptions},
     io::Write,
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -85,6 +85,68 @@ fn find_matching_media(transcript_path: String) -> Result<Option<String>, String
     Ok(None)
 }
 
+fn is_cuebert_json_path(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|file_name| file_name.to_str())
+        .map(|file_name| file_name.to_lowercase().ends_with(".cuebert.json"))
+        .unwrap_or(false)
+}
+
+fn is_vtt_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .map(|extension| extension.eq_ignore_ascii_case("vtt"))
+        .unwrap_or(false)
+}
+
+#[tauri::command]
+fn write_transcript_autosave(
+    source_path: String,
+    target_path: String,
+    contents: String,
+) -> Result<(), String> {
+    let source_path = PathBuf::from(source_path);
+    let target_path = PathBuf::from(target_path);
+
+    if !source_path.is_file() {
+        return Err(format!(
+            "source transcript does not exist: {}",
+            source_path.display()
+        ));
+    }
+
+    let source_dir = source_path
+        .parent()
+        .ok_or_else(|| "source transcript has no parent directory".to_string())?;
+    let target_dir = target_path
+        .parent()
+        .ok_or_else(|| "autosave target has no parent directory".to_string())?;
+
+    if source_dir != target_dir {
+        return Err(format!(
+            "autosave target must be in the same directory as the source transcript: {}",
+            target_path.display()
+        ));
+    }
+
+    if target_path == source_path {
+        if !is_cuebert_json_path(&target_path) && !is_vtt_path(&target_path) {
+            return Err(format!(
+                "autosave can only overwrite .cuebert.json or .vtt transcripts: {}",
+                target_path.display()
+            ));
+        }
+    } else if !is_cuebert_json_path(&target_path) {
+        return Err(format!(
+            "autosave target must be a .cuebert.json file: {}",
+            target_path.display()
+        ));
+    }
+
+    write(&target_path, contents)
+        .map_err(|error| format!("failed to write {}: {error}", target_path.display()))
+}
+
 fn main() {
     std::panic::set_hook(Box::new(|panic_info| {
         let location = panic_info
@@ -116,7 +178,11 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![append_log, find_matching_media])
+        .invoke_handler(tauri::generate_handler![
+            append_log,
+            find_matching_media,
+            write_transcript_autosave
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

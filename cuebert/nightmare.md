@@ -2,18 +2,6 @@ The nightmare is that `SubtitleEditor` is doing **everything**: UI shell, file l
 
 Refactor in this order:
 
-### 2. Extract the safest files first
-
-Then:
-
-```js
-// services/TranscriptExporter.js
-export function buildVtt(cues) {}
-export function buildPlainText(cues) {}
-export function buildAtrainJson(cues, sourceData, options) {}
-```
-
-These are easiest because they barely need DOM.
 
 ### 3. Extract cue mutation next
 

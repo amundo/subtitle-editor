@@ -48,6 +48,7 @@ class SubtitleEditor extends HTMLElement {
     this.hasUnsavedChanges = false
     this.changeRevision = 0
     this.lastAutosavedAt = null
+    this.lastAutosaveDiagnosticSignature = ''
 
     // audio analysis state
     this.audioBuffer = null
@@ -689,6 +690,13 @@ class SubtitleEditor extends HTMLElement {
     this.downloadBtn.disabled = false
     this.downloadTextBtn.disabled = false
     this.updateMediaLoadControlVisibility(parsed.sourceData)
+    window.cuebertLog?.('info', 'loaded-transcript', {
+      fileName,
+      sourcePath,
+      format: parsed.format,
+      cueCount: parsed.cues.length,
+      autosave: this.getAutosaveAvailability()
+    })
     this.updateAutosaveStatus()
   }
 
@@ -752,15 +760,72 @@ class SubtitleEditor extends HTMLElement {
     }
   }
 
+  getAutosaveAvailability() {
+    const hasWriteTextFile = Boolean(window.__TAURI__?.fs?.writeTextFile)
+    const hasTranscriptAutosaveCommand = Boolean(window.__TAURI__?.core?.invoke)
+    const hasTranscriptPath = Boolean(this.loadedTranscriptPath)
+    const isCuebertJson = this.isCuebertJsonPath(this.loadedTranscriptPath)
+    const targetPath = this.getAutosaveTargetPath()
+    let reason = 'available'
+
+    if (!hasTranscriptPath) {
+      reason = 'missing-loadedTranscriptPath'
+    } else if (!targetPath) {
+      reason = 'unsupported-format'
+    } else if (!this.hasAutosaveWriterForTarget(targetPath)) {
+      reason = 'missing-transcript-autosave-command'
+    }
+
+    return {
+      available: reason === 'available',
+      reason,
+      loadedTranscriptPath: this.loadedTranscriptPath,
+      loadedTranscriptFormat: this.loadedTranscriptFormat,
+      hasWriteTextFile,
+      hasTranscriptAutosaveCommand,
+      isCuebertJson,
+      targetPath,
+      willCreateCuebertJson: this.loadedTranscriptFormat === 'atrain-json' &&
+        Boolean(targetPath) &&
+        targetPath !== this.loadedTranscriptPath
+    }
+  }
+
+  hasAutosaveWriterForTarget(targetPath) {
+    if (!targetPath) return false
+    return Boolean(window.__TAURI__?.core?.invoke)
+  }
+
+  getAutosaveTargetPath() {
+    if (!this.loadedTranscriptPath) return null
+    if (this.loadedTranscriptFormat === 'vtt') return this.loadedTranscriptPath
+    if (this.loadedTranscriptFormat !== 'atrain-json') return null
+    if (this.isCuebertJsonPath(this.loadedTranscriptPath)) return this.loadedTranscriptPath
+
+    return this.getCuebertJsonPathForSource(this.loadedTranscriptPath)
+  }
+
   canAutosave() {
-    if (!this.loadedTranscriptPath || !window.__TAURI__?.fs?.writeTextFile) return false
-    if (this.loadedTranscriptFormat === 'vtt') return true
-    return this.loadedTranscriptFormat === 'atrain-json' &&
-      this.isCuebertJsonPath(this.loadedTranscriptPath)
+    return this.getAutosaveAvailability().available
+  }
+
+  logAutosaveDiagnostic(message, detail = {}) {
+    const payload = {
+      ...detail,
+      autosave: this.getAutosaveAvailability(),
+      hasUnsavedChanges: this.hasUnsavedChanges,
+      autosaveEnabled: this.autosaveEnabled
+    }
+    const signature = JSON.stringify({ message, payload })
+    if (signature === this.lastAutosaveDiagnosticSignature) return
+
+    this.lastAutosaveDiagnosticSignature = signature
+    window.cuebertLog?.('info', message, payload)
   }
 
   async autosave() {
     if (!this.hasUnsavedChanges || !this.autosaveEnabled || !this.canAutosave()) {
+      this.logAutosaveDiagnostic('autosave-skipped')
       this.updateAutosaveStatus()
       return
     }
@@ -776,8 +841,16 @@ class SubtitleEditor extends HTMLElement {
     try {
       const revision = this.changeRevision
       const contents = this.buildLoadedTranscriptContents()
-      await window.__TAURI__.fs.writeTextFile(this.loadedTranscriptPath, contents)
+      const targetPath = this.getAutosaveTargetPath()
+      if (!targetPath) throw new Error('Autosave target path is unavailable')
+
+      const previousPath = this.loadedTranscriptPath
+      await this.writeAutosaveContents(targetPath, contents)
       if (revision === this.changeRevision) {
+        if (targetPath !== previousPath) {
+          this.loadedTranscriptPath = targetPath
+          this.updateMediaLoadControlVisibility()
+        }
         this.hasUnsavedChanges = false
         this.syncLoadedTranscriptMetadata()
       } else {
@@ -785,6 +858,11 @@ class SubtitleEditor extends HTMLElement {
         this.autosaveQueued = true
       }
       this.lastAutosavedAt = new Date()
+      window.cuebertLog?.('info', 'autosaved-transcript', {
+        previousPath,
+        targetPath,
+        createdCuebertJson: targetPath !== previousPath
+      })
       this.updateAutosaveStatus()
     } finally {
       this.autosaveInFlight = false
@@ -794,6 +872,14 @@ class SubtitleEditor extends HTMLElement {
       this.autosaveQueued = false
       this.scheduleAutosave()
     }
+  }
+
+  async writeAutosaveContents(targetPath, contents) {
+    await window.__TAURI__.core.invoke('write_transcript_autosave', {
+      sourcePath: this.loadedTranscriptPath,
+      targetPath,
+      contents
+    })
   }
 
   buildLoadedTranscriptContents() {
@@ -838,11 +924,11 @@ class SubtitleEditor extends HTMLElement {
       return
     }
 
-    if (!this.canAutosave()) {
-      this.autosaveStatus.textContent = window.__TAURI__?.fs?.writeTextFile
-        ? 'Autosave unavailable'
-        : 'Autosave desktop only'
+    const autosave = this.getAutosaveAvailability()
+    if (!autosave.available) {
+      this.autosaveStatus.textContent = this.getAutosaveUnavailableMessage(autosave)
       this.autosaveStatus.dataset.state = 'idle'
+      this.logAutosaveDiagnostic('autosave-unavailable')
       return
     }
 
@@ -868,6 +954,13 @@ class SubtitleEditor extends HTMLElement {
     this.autosaveStatus.dataset.state = 'saved'
   }
 
+  getAutosaveUnavailableMessage(autosave) {
+    if (!autosave.hasTranscriptAutosaveCommand) return 'Autosave desktop only'
+    if (!autosave.loadedTranscriptPath) return 'Open from disk to autosave'
+
+    return 'Autosave unavailable'
+  }
+
   getFilePath(file) {
     return file?.path || file?.webkitRelativePath || null
   }
@@ -876,6 +969,19 @@ class SubtitleEditor extends HTMLElement {
     return typeof path === 'string'
       ? path.split(/[\\/]/).pop() || ''
       : ''
+  }
+
+  getPathDirectory(path) {
+    if (typeof path !== 'string') return ''
+
+    const index = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+    return index === -1 ? '' : path.slice(0, index)
+  }
+
+  joinPath(directory, fileName) {
+    if (!directory) return fileName
+    const separator = directory.includes('\\') ? '\\' : '/'
+    return `${directory}${separator}${fileName}`
   }
 
   getTranscriptTitle() {
@@ -889,12 +995,21 @@ class SubtitleEditor extends HTMLElement {
   }
 
   getCuebertJsonDefaultPath() {
-    const sourceName = this.getPathFileName(this.loadedTranscriptPath)
+    return this.getCuebertJsonFileNameForSource(this.loadedTranscriptPath)
+  }
+
+  getCuebertJsonFileNameForSource(sourcePath) {
+    const sourceName = this.getPathFileName(sourcePath)
     const baseName = sourceName
       ? sourceName.replace(/(?:\.cuebert)?\.json$/i, '').replace(/\.[^.]+$/, '')
       : this.getTranscriptTitle()
 
     return `${baseName || 'transcription'}.cuebert.json`
+  }
+
+  getCuebertJsonPathForSource(sourcePath) {
+    const directory = this.getPathDirectory(sourcePath)
+    return this.joinPath(directory, this.getCuebertJsonFileNameForSource(sourcePath))
   }
 
   isCuebertJsonPath(path) {
