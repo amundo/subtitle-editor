@@ -1,27 +1,45 @@
 // SubtitleEditor.js
 import './cue-editor/CueEditor.js'
-import {formatTime, parseTime} from './services/time.js'
+import './cue-list-view/CueListView.js'
+import { formatTime, parseTime } from './services/time.js'
 import {
-    parseSubtitleFile,
-    parseVtt,
-    parseAtrainJson
+  parseSubtitleFile,
+  parseVtt,
+  parseAtrainJson
 } from './services/TranscriptParser.js'
+import {
+  buildVtt,
+  buildPlainText,
+  buildAtrainJson
+} from './services/TranscriptExporter.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
     super()
+
+    this.isInitialized = false
+
+    // transcript/document state
     this.cues = []
     this.manualSpeakers = []
     this.loadedTranscript = null
     this.loadedTranscriptFormat = null
     this.loadedTranscriptPath = null
+
+    // media source state
     this.mediaLoadedFromPath = null
     this.autoLoadedMediaPath = null
+
+    // preview/playback state
     this.previewEnd = null
     this.previewTrackUrl = null
+
+    // display preferences
     this.cueFontSizeEm = 1
     this.minCueFontSizeEm = 0.6
     this.maxCueFontSizeEm = 2
+
+    // autosave state
     this.autosaveEnabled = true
     this.autosaveDelayMs = 1200
     this.autosaveTimer = null
@@ -31,13 +49,13 @@ class SubtitleEditor extends HTMLElement {
     this.changeRevision = 0
     this.lastAutosavedAt = null
 
-    // audio analysis
+    // audio analysis state
     this.audioBuffer = null
     this.envelope = null
     this.frameDuration = null
     this.valleys = null
 
-    // active cue for focused editor state
+    // cue focus/playback UI state
     this.activeCue = null
     this.activeCueElement = null
     this.cueElementByCue = new Map()
@@ -47,6 +65,12 @@ class SubtitleEditor extends HTMLElement {
   }
 
   connectedCallback() {
+    if (this.isInitialized) return
+    this.initialize()
+    this.isInitialized = true
+  }
+
+  initialize() {
     this.renderShell()
     this.cacheElements()
     this.bindEvents()
@@ -95,7 +119,7 @@ class SubtitleEditor extends HTMLElement {
               <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
-          <div data-role="cueList" class="cue-list"></div>
+          <cue-list-view data-role="cueList" class="cue-list"></cue-list-view>
         </div>
 
         <footer class="media-bar">
@@ -189,13 +213,25 @@ class SubtitleEditor extends HTMLElement {
     this.addSpeakerInput = this.querySelector('[data-role="addSpeakerInput"]')
     this.speakerList = this.querySelector('[data-role="speakerList"]')
     this.cuebertLogo = this.querySelector('#cuebert-logo')
-    this.adjustFontSizeButtons = {  
+    this.adjustFontSizeButtons = {
       increase: this.querySelector('[data-role="increaseFontBtn"]'),
       decrease: this.querySelector('[data-role="decreaseFontBtn"]')
     }
   }
 
+
   bindEvents() {
+    this.bindVideoEvents()
+    this.bindFileEvents()
+    this.bindExportEvents()
+    this.bindSpeakerEvents()
+    this.bindTransportControls()
+    this.bindPreferenceEvents()
+
+    this.updateTransportUi()
+  }
+
+  bindVideoEvents() {
     this.video.addEventListener('timeupdate', () => {
       this.updateTransportUi()
       this.syncActiveCueToPlayback('timeupdate')
@@ -222,6 +258,14 @@ class SubtitleEditor extends HTMLElement {
       this.updateTransportUi()
     })
 
+    this.previewTrack?.addEventListener('load', () => {
+      this.ensurePreviewTrackShowing()
+      this.bindPreviewCueEvents()
+      this.syncActiveCueToPlayback('trackload')
+    })
+  }
+
+  bindFileEvents() {
     this.videoFileInput.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
@@ -237,6 +281,7 @@ class SubtitleEditor extends HTMLElement {
       if (this.mediaLoadedFromPath) this.markMediaPathChanged()
       this.updateMediaLoadControlVisibility()
     })
+
     this.vttFileInput.addEventListener('click', e => {
       if (!this.canUseNativeTranscriptPicker()) return
 
@@ -261,6 +306,9 @@ class SubtitleEditor extends HTMLElement {
       })
     })
 
+
+  }
+  bindExportEvents() {
     this.downloadBtn.addEventListener('click', () => {
       this.saveTextOutput({
         defaultPath: 'adjusted-subtitles.vtt',
@@ -299,6 +347,8 @@ class SubtitleEditor extends HTMLElement {
       })
     })
 
+  }
+  bindSpeakerEvents() {
     this.editSpeakersBtn.addEventListener('click', () => {
       if (this.speakerDialog) this.speakerDialog.showModal()
     })
@@ -312,21 +362,8 @@ class SubtitleEditor extends HTMLElement {
       this.addSpeaker(this.addSpeakerInput?.value ?? '')
     })
 
-    this.autosaveToggle?.addEventListener('change', () => {
-      this.autosaveEnabled = this.autosaveToggle.checked
-      if (!this.autosaveEnabled) {
-        this.cancelScheduledAutosave()
-      } else if (this.hasUnsavedChanges) {
-        this.scheduleAutosave()
-      }
-      this.updateAutosaveStatus()
-    })
-
-    this.previewTrack?.addEventListener('load', () => {
-      this.ensurePreviewTrackShowing()
-      this.bindPreviewCueEvents()
-      this.syncActiveCueToPlayback('trackload')
-    })
+  }
+  bindTransportControls() {
 
     this.mediaPlayBtn?.addEventListener('click', () => {
       if (!this.video.src) return
@@ -361,6 +398,20 @@ class SubtitleEditor extends HTMLElement {
       this.updateTransportUi()
     })
 
+  }
+  bindPreferenceEvents() {
+    this.autosaveToggle?.addEventListener('change', () => {
+      this.autosaveEnabled = this.autosaveToggle.checked
+      if (!this.autosaveEnabled) {
+        this.cancelScheduledAutosave()
+      } else if (this.hasUnsavedChanges) {
+        this.scheduleAutosave()
+      }
+      this.updateAutosaveStatus()
+    })
+
+
+
     this.adjustFontSizeButtons.increase?.addEventListener('click', () => {
       this.adjustCueFontSize(0.1)
     })
@@ -369,7 +420,6 @@ class SubtitleEditor extends HTMLElement {
       this.adjustCueFontSize(-0.1)
     })
 
-    this.updateTransportUi()
   }
 
   adjustCueFontSize(deltaEm) {
@@ -642,49 +692,6 @@ class SubtitleEditor extends HTMLElement {
     this.updateAutosaveStatus()
   }
 
-  // ---------- VTT parsing/building ----------
-
-
-
-  getSegmentSpeaker(segment) {
-    if (typeof segment?.speaker === 'string' && segment.speaker.trim()) {
-      return segment.speaker.trim()
-    }
-
-    if (Array.isArray(segment?.words)) {
-      const firstWordSpeaker = segment.words.find(word =>
-        typeof word?.speaker === 'string' && word.speaker.trim()
-      )
-      if (firstWordSpeaker) {
-        return firstWordSpeaker.speaker.trim()
-      }
-    }
-
-    return null
-  }
-
-  isFiniteNumber(value) {
-    return typeof value === 'number' && Number.isFinite(value)
-  }
-
-
-
-  formatCueTextForExport(cue) {
-    const text = (cue.text || '').trim()
-    const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
-    if (!speaker || !text) return text
-
-    const speakerPrefix = `[${speaker}] `
-    return text.startsWith(speakerPrefix) ? text : `${speakerPrefix}${text}`
-  }
-  getCueSourceSegmentIds(cue) {
-    if (Array.isArray(cue.sourceSegmentIds) && cue.sourceSegmentIds.length) {
-      return cue.sourceSegmentIds
-    }
-
-    return [cue.sourceSegmentId ?? cue.id]
-  }
-
   refreshPreviewTrack() {
     if (!this.previewTrack) return
 
@@ -710,6 +717,15 @@ class SubtitleEditor extends HTMLElement {
     this.updateAutosaveStatus()
   }
 
+  afterCueChange({ speakersChanged = true } = {}) {
+    if (speakersChanged) {
+      this.renderSpeakerEditor()
+    }
+
+    this.renderCues()
+    this.markDirty()
+  }
+  
   markMediaPathChanged() {
     if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
     this.markDirty()
@@ -782,7 +798,11 @@ class SubtitleEditor extends HTMLElement {
 
   buildLoadedTranscriptContents() {
     if (this.loadedTranscriptFormat === 'atrain-json') {
-      const json = buildAtrainJson(this.cues, this.loadedTranscript)
+      const json = buildAtrainJson(this.cues, this.loadedTranscript, {
+        mediaPath: this.mediaLoadedFromPath,
+        speakers: this.getUniqueSpeakers(),
+        title: this.getTranscriptTitle()
+      })
       return `${JSON.stringify(json, null, 2)}\n`
     }
 
@@ -840,10 +860,10 @@ class SubtitleEditor extends HTMLElement {
 
     this.autosaveStatus.textContent = this.lastAutosavedAt
       ? `Saved ${this.lastAutosavedAt.toLocaleTimeString([], {
-          hour: 'numeric',
-          minute: '2-digit',
-          second: '2-digit'
-        })}`
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit'
+      })}`
       : 'Autosave ready'
     this.autosaveStatus.dataset.state = 'saved'
   }
@@ -1027,11 +1047,11 @@ class SubtitleEditor extends HTMLElement {
   }
 
   findCueAtTime(time) {
-    if (!this.isFiniteNumber(time)) return null
+    if (!Number.isFinite(time)) return null
 
     return this.cues.find(cue =>
-      this.isFiniteNumber(cue?.start) &&
-      this.isFiniteNumber(cue?.end) &&
+      Number.isFinite(cue?.start) &&
+      Number.isFinite(cue?.end) &&
       time >= cue.start &&
       time < cue.end
     ) ?? null
@@ -1095,87 +1115,16 @@ class SubtitleEditor extends HTMLElement {
       }
     })
 
-    this.renderSpeakerEditor()
-    this.renderCues()
-    this.markDirty()
+    this.afterCueChange()
   }
 
   setCueSpeaker(cue, speaker) {
     const nextSpeaker = typeof speaker === 'string' ? speaker.trim() : ''
     cue.speaker = nextSpeaker || null
-    this.renderSpeakerEditor()
-    this.renderCues()
-    this.markDirty()
+    this.afterCueChange()
   }
 
-  splitCue(cue, selection = {}) {
-    const index = this.cues.indexOf(cue)
-    if (index === -1) return
 
-    const splitTime = this.getCueSplitTime(cue)
-    if (splitTime <= cue.start || splitTime >= cue.end) return
-
-    const [beforeText, afterText] = this.splitCueText(
-      cue.text || '',
-      selection.selectionStart
-    )
-    const nextCue = {
-      ...cue,
-      id: this.createCueId(cue.id, 'b'),
-      start: splitTime,
-      end: cue.end,
-      text: afterText,
-      sourceSegmentIds: this.getCueSourceSegmentIds(cue)
-    }
-
-    cue.id = this.createCueId(cue.id, 'a')
-    cue.end = splitTime
-    cue.text = beforeText
-    cue.sourceSegmentIds = this.getCueSourceSegmentIds(cue)
-
-    this.cues.splice(index + 1, 0, nextCue)
-    this.renderSpeakerEditor()
-    this.renderCues()
-    this.markDirty()
-  }
-
-  mergeCues(targetCue, mergedCue) {
-    const mergedIndex = this.cues.indexOf(mergedCue)
-    if (mergedIndex === -1) return
-
-    targetCue.start = Math.min(targetCue.start, mergedCue.start)
-    targetCue.end = Math.max(targetCue.end, mergedCue.end)
-    targetCue.text = this.joinCueText(targetCue.text, mergedCue.text)
-    targetCue.sourceSegmentIds = [
-      ...new Set([
-        ...this.getCueSourceSegmentIds(targetCue),
-        ...this.getCueSourceSegmentIds(mergedCue)
-      ])
-    ]
-    if (!targetCue.speaker && mergedCue.speaker) {
-      targetCue.speaker = mergedCue.speaker
-    }
-
-    this.cues.splice(mergedIndex, 1)
-    this.renderSpeakerEditor()
-    this.renderCues()
-    this.markDirty()
-  }
-
-  deleteCue(cue) {
-    const index = this.cues.indexOf(cue)
-    if (index === -1) return
-
-    this.cues.splice(index, 1)
-    if (this.activeCue === cue) {
-      this.activeCue = null
-      this.activeCueElement = null
-    }
-
-    this.renderSpeakerEditor()
-    this.renderCues()
-    this.markDirty()
-  }
 
   setCueBoundary(cue, edge, time) {
     const minCueDuration = 0.05
@@ -1225,7 +1174,7 @@ class SubtitleEditor extends HTMLElement {
   getCueSplitTime(cue) {
     const currentTime = this.video?.currentTime
     if (
-      this.isFiniteNumber(currentTime) &&
+      Number.isFinite(currentTime) &&
       currentTime > cue.start &&
       currentTime < cue.end
     ) {
@@ -1335,133 +1284,81 @@ class SubtitleEditor extends HTMLElement {
   }
 
   renderCues() {
-    this.cueList.innerHTML = ''
-    this.cueElementByCue = new Map()
-
-    this.cues.forEach((cue, index) => {
-      if (index > 0) {
-        this.cueList.appendChild(this.createMergeCueRow(
-          this.cues[index - 1],
-          cue
-        ))
+    this.cueList.data = {
+      cues: this.cues,
+      video: this.video,
+      activeCue: this.activeCue,
+      playbackCue: this.playbackCue,
+      speakers: this.getUniqueSpeakers(),
+      envelope: this.envelope,
+      frameDuration: this.frameDuration,
+      formatTime,
+      handlers: {
+        onPlayCue: cue => {
+          this.playTimeRange(cue.start, cue.end)
+        },
+        onSnapStartToNow: cue => {
+          cue.start = this.video.currentTime
+          if (cue.start > cue.end) cue.start = cue.end
+          this.afterCueChange({ speakersChanged: false })
+        },
+        onSnapEndToNow: cue => {
+          cue.end = this.video.currentTime
+          if (cue.end < cue.start) cue.end = cue.start
+          this.afterCueChange({ speakersChanged: false })
+        },
+        onExtendStartBackward: cue => {
+          cue.start = this.findPrevValleyTime(cue.start)
+          this.afterCueChange({ speakersChanged: false })
+        },
+        onExtendEndForward: cue => {
+          cue.end = this.findNextValleyTime(cue.end)
+          this.afterCueChange({ speakersChanged: false })
+        },
+        onSetSpeaker: (cue, nextSpeaker) => {
+          this.setCueSpeaker(cue, nextSpeaker)
+        },
+        onSplitCue: (cue, selection) => {
+          this.splitCue(cue, selection)
+        },
+        onDeleteCue: cue => {
+          this.deleteCue(cue)
+        },
+        onWaveformSeek: (cue, time, cueEditor) => {
+          this.setActiveCue(cue, cueEditor)
+          this.video.currentTime = this.clamp(time, 0, this.getMediaDuration())
+          this.updateTransportUi()
+        },
+        onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
+          this.setCueBoundary(cue, edge, time)
+          cueEditor.updateTimeLabels()
+          cueEditor.renderWaveform()
+          this.updateTransportUi()
+        },
+        onWaveformBoundaryCommit: (cue, { edge, time }, cueEditor) => {
+          const nextEdge = this.setCueBoundary(cue, edge, time)
+          cueEditor.updateTimeLabels()
+          cueEditor.renderWaveform()
+          this.playBoundaryPreview(cue, nextEdge)
+          this.markDirty()
+        },
+        onFocusCue: (cue, cueEditor) => {
+          this.setActiveCue(cue, cueEditor)
+        },
+        onCueChange: () => {
+          this.markDirty()
+        },
+        onMergeCues: (previousCue, nextCue) => {
+          this.mergeCues(previousCue, nextCue)
+        }
       }
+    }
 
-      const ce = document.createElement('cue-editor')
-      ce.data = cue
-      ce.video = this.video
-      ce.formatTime = formatTime.bind(this)
-      ce.speakerOptions = this.getUniqueSpeakers()
-
-      // waveform props (will be null until analysis is ready)
-      ce.envelope = this.envelope
-      ce.frameDuration = this.frameDuration
-      ce.contextWindow = 0.75
-      this.cueElementByCue.set(cue, ce)
-      if (this.activeCue === cue || this.playbackCue === cue) {
-        ce.classList.add('is-active')
-        this.activeCueElement = ce
-      }
-      if (this.playbackCue === cue) {
-        ce.classList.add('is-playback-active')
-        this.playbackCueElement = ce
-      }
-
-      // callbacks
-      ce.onPlayCue = c => {
-        this.playTimeRange(c.start, c.end)
-      }
-
-      ce.onSnapStartToNow = () => {
-        cue.start = this.video.currentTime
-        if (cue.start > cue.end) cue.start = cue.end
-        this.renderCues()
-        this.markDirty()
-      }
-
-      ce.onSnapEndToNow = () => {
-        cue.end = this.video.currentTime
-        if (cue.end < cue.start) cue.end = cue.start
-        this.renderCues()
-        this.markDirty()
-      }
-
-      ce.onExtendStartBackward = () => {
-        cue.start = this.findPrevValleyTime(cue.start)
-        this.renderCues()
-        this.markDirty()
-      }
-
-      ce.onExtendEndForward = () => {
-        cue.end = this.findNextValleyTime(cue.end)
-        this.renderCues()
-        this.markDirty()
-      }
-
-      ce.onSetSpeaker = nextSpeaker => {
-        this.setCueSpeaker(cue, nextSpeaker)
-      }
-
-      ce.onSplitCue = selection => {
-        this.splitCue(cue, selection)
-      }
-
-      ce.onDeleteCue = () => {
-        this.deleteCue(cue)
-      }
-
-      ce.onWaveformSeek = time => {
-        this.setActiveCue(cue, ce)
-        this.video.currentTime = this.clamp(time, 0, this.getMediaDuration())
-        this.updateTransportUi()
-      }
-
-      ce.onWaveformBoundaryChange = ({ edge, time }) => {
-        this.setCueBoundary(cue, edge, time)
-        ce.updateTimeLabels()
-        ce.renderWaveform()
-        this.updateTransportUi()
-      }
-
-      ce.onWaveformBoundaryCommit = ({ edge, time }) => {
-        const nextEdge = this.setCueBoundary(cue, edge, time)
-        ce.updateTimeLabels()
-        ce.renderWaveform()
-        this.playBoundaryPreview(cue, nextEdge)
-        this.markDirty()
-      }
-
-      ce.addEventListener('focusin', () => {
-        this.setActiveCue(cue, ce)
-      })
-      ce.addEventListener('click', () => {
-        this.setActiveCue(cue, ce)
-      })
-      ce.addEventListener('cuechange', () => {
-        this.markDirty()
-      })
-
-      this.cueList.appendChild(ce)
-    })
+    this.cueElementByCue = this.cueList.cueElementByCue
+    this.activeCueElement = this.cueList.activeCueElement
+    this.playbackCueElement = this.cueList.playbackCueElement
 
     this.bindPreviewCueEvents()
-  }
-
-  createMergeCueRow(previousCue, nextCue) {
-    const row = document.createElement('div')
-    row.className = 'cue-merge-row'
-
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'cue-merge-button'
-    button.textContent = '▲ merge ▼'
-    
-    button.title = 'Merge the cue above with the cue below'
-    button.addEventListener('click', () => {
-      this.mergeCues(previousCue, nextCue)
-    })
-
-    row.appendChild(button)
-    return row
   }
 }
 

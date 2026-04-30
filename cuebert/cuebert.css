@@ -305,6 +305,7 @@ cue-bert {
   }
 
   .cue-list {
+    display: block;
     border: 1px solid #d8dee4;
     padding: 1rem;
     border-radius: 0 0 0.25rem 0.25rem;

@@ -48,5 +48,7 @@
     "variables": "#234040",
     "numbers": "#b88452",
     "types": "#5f9d9d"
-  }
+  },
+  "editor.tabSize": 2,
+  "editor.detectIndentation": false
 }
