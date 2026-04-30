@@ -1,0 +1,187 @@
+diff --git a/cuebert-original/subtitle-editor/cuebert/SubtitleEditor.js b/cuebert/subtitle-editor/cuebert/SubtitleEditor.js
+index 57a1c9e..f9e501d 100644
+--- a/cuebert-original/subtitle-editor/cuebert/SubtitleEditor.js
++++ b/cuebert/subtitle-editor/cuebert/SubtitleEditor.js
+@@ -32,6 +32,7 @@ class SubtitleEditor extends HTMLElement {
+     this.cueFontSizeEm = 1
+     this.minCueFontSizeEm = 0.6
+     this.maxCueFontSizeEm = 2
++    this.cueSearchQuery = ''
+ 
+     // autosave state
+     this.autosaveEnabled = true
+@@ -117,6 +118,19 @@ class SubtitleEditor extends HTMLElement {
+               <button data-role="downloadBtn" disabled>VTT</button>
+             </div>
+           </div>
++          <div class="cue-search-row">
++            <label class="cue-search-label">
++              <span>Search cues</span>
++              <input
++                data-role="cueSearchInput"
++                class="cue-search-input"
++                type="search"
++                placeholder="Search text or speaker…"
++                autocomplete="off"
++              >
++            </label>
++            <span data-role="cueSearchCount" class="cue-search-count"></span>
++          </div>
+           <cue-list-view data-role="cueList" class="cue-list"></cue-list-view>
+         </div>
+ 
+@@ -199,6 +213,8 @@ class SubtitleEditor extends HTMLElement {
+     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
+     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
+     this.cueList = this.querySelector('[data-role="cueList"]')
++    this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
++    this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
+     this.saveBtn = this.querySelector('[data-role="saveBtn"]')
+     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
+     this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
+@@ -248,6 +264,7 @@ class SubtitleEditor extends HTMLElement {
+     this.bindSpeakerEvents()
+     this.transportController.bindTransportControls()
+     this.bindPreferenceEvents()
++    this.bindCueSearchEvents()
+ 
+     this.transportController.updateUi()
+   }
+@@ -355,6 +372,13 @@ class SubtitleEditor extends HTMLElement {
+     })
+ 
+   }
++  bindCueSearchEvents() {
++    this.cueSearchInput?.addEventListener('input', () => {
++      this.cueSearchQuery = this.cueSearchInput.value
++      this.renderCues()
++    })
++  }
++
+   bindPreferenceEvents() {
+     this.autosaveToggle?.addEventListener('change', () => {
+       this.autosaveEnabled = this.autosaveToggle.checked
+@@ -583,6 +607,8 @@ class SubtitleEditor extends HTMLElement {
+     this.loadedTranscriptFormat = document.format
+     this.loadedTranscriptPath = document.path
+     this.manualSpeakers = []
++    this.cueSearchQuery = ''
++    if (this.cueSearchInput) this.cueSearchInput.value = ''
+     this.hasUnsavedChanges = false
+     this.changeRevision = 0
+     this.lastAutosavedAt = null
+@@ -1205,9 +1231,43 @@ class SubtitleEditor extends HTMLElement {
+     })
+   }
+ 
++  getVisibleCues() {
++    const query = this.cueSearchQuery.trim().toLowerCase()
++    if (!query) return this.cues
++
++    return this.cues.filter(cue => {
++      const searchableText = [cue?.text, cue?.speaker]
++        .filter(Boolean)
++        .join('\n')
++        .toLowerCase()
++
++      return searchableText.includes(query)
++    })
++  }
++
++  updateCueSearchCount(visibleCues) {
++    if (!this.cueSearchCount) return
++
++    const query = this.cueSearchQuery.trim()
++    if (!query) {
++      this.cueSearchCount.textContent = this.cues.length
++        ? `${this.cues.length} cues`
++        : ''
++      return
++    }
++
++    const cueLabel = visibleCues.length === 1 ? 'cue' : 'cues'
++    this.cueSearchCount.textContent = `${visibleCues.length} of ${this.cues.length} ${cueLabel}`
++  }
++
+   renderCues() {
++    const visibleCues = this.getVisibleCues()
++    const isSearching = this.cueSearchQuery.trim().length > 0
++    this.updateCueSearchCount(visibleCues)
++
+     this.cueList.data = {
+-      cues: this.cues,
++      cues: visibleCues,
++      allowMerge: !isSearching,
+       video: this.video,
+       activeCue: this.activeCue,
+       playbackCue: this.playbackCue,
+diff --git a/cuebert-original/subtitle-editor/cuebert/cue-list-view/CueListView.js b/cuebert/subtitle-editor/cuebert/cue-list-view/CueListView.js
+index 12809b6..5eb155b 100644
+--- a/cuebert-original/subtitle-editor/cuebert/cue-list-view/CueListView.js
++++ b/cuebert/subtitle-editor/cuebert/cue-list-view/CueListView.js
+@@ -42,6 +42,7 @@ class CueListView extends HTMLElement {
+   render() {
+     const {
+       cues = [],
++      allowMerge = true,
+       video = null,
+       activeCue = null,
+       playbackCue = null,
+@@ -58,7 +59,7 @@ class CueListView extends HTMLElement {
+     this.playbackCueElement = null
+ 
+     cues.forEach((cue, index) => {
+-      if (index > 0) {
++      if (allowMerge && index > 0) {
+         this.appendChild(this.createMergeCueRow(cues[index - 1], cue, handlers))
+       }
+ 
+diff --git a/cuebert-original/subtitle-editor/cuebert/cuebert.css b/cuebert/subtitle-editor/cuebert/cuebert.css
+index 261e286..3467c9d 100644
+--- a/cuebert-original/subtitle-editor/cuebert/cuebert.css
++++ b/cuebert/subtitle-editor/cuebert/cuebert.css
+@@ -304,6 +304,44 @@ cue-bert {
+     margin-top: 0.75rem;
+   }
+ 
++
++  .cue-search-row {
++    display: flex;
++    justify-content: space-between;
++    align-items: center;
++    gap: 0.75rem;
++    padding: 0.6rem 0.75rem;
++    border-inline: 1px solid #d8dee4;
++    background: #fff;
++  }
++
++  .cue-search-label {
++    display: flex;
++    align-items: center;
++    gap: 0.5rem;
++    min-width: 0;
++    flex: 1;
++    color: #57606a;
++    font-size: 0.9rem;
++    font-weight: 600;
++  }
++
++  .cue-search-input {
++    min-width: 12rem;
++    max-width: 28rem;
++    flex: 1;
++    padding: 0.45rem 0.65rem;
++    border: 1px solid #d0d7de;
++    border-radius: 999px;
++    font: inherit;
++  }
++
++  .cue-search-count {
++    color: #57606a;
++    font-size: 0.85rem;
++    white-space: nowrap;
++  }
++
+   .cue-list {
+     display: block;
+     border: 1px solid #d8dee4;

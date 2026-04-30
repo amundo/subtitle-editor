@@ -32,6 +32,7 @@ class SubtitleEditor extends HTMLElement {
     this.cueFontSizeEm = 1
     this.minCueFontSizeEm = 0.6
     this.maxCueFontSizeEm = 2
+    this.cueSearchQuery = ''
 
     // autosave state
     this.autosaveEnabled = true
@@ -117,6 +118,19 @@ class SubtitleEditor extends HTMLElement {
               <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
+          <div class="cue-search-row">
+            <label class="cue-search-label">
+              <span>Search cues</span>
+              <input
+                data-role="cueSearchInput"
+                class="cue-search-input"
+                type="search"
+                placeholder="Search text or speaker…"
+                autocomplete="off"
+              >
+            </label>
+            <span data-role="cueSearchCount" class="cue-search-count"></span>
+          </div>
           <cue-list-view data-role="cueList" class="cue-list"></cue-list-view>
         </div>
 
@@ -199,6 +213,8 @@ class SubtitleEditor extends HTMLElement {
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
+    this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
+    this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
     this.saveBtn = this.querySelector('[data-role="saveBtn"]')
     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
     this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
@@ -248,6 +264,7 @@ class SubtitleEditor extends HTMLElement {
     this.bindSpeakerEvents()
     this.transportController.bindTransportControls()
     this.bindPreferenceEvents()
+    this.bindCueSearchEvents()
 
     this.transportController.updateUi()
   }
@@ -355,6 +372,13 @@ class SubtitleEditor extends HTMLElement {
     })
 
   }
+  bindCueSearchEvents() {
+    this.cueSearchInput?.addEventListener('input', () => {
+      this.cueSearchQuery = this.cueSearchInput.value
+      this.renderCues()
+    })
+  }
+
   bindPreferenceEvents() {
     this.autosaveToggle?.addEventListener('change', () => {
       this.autosaveEnabled = this.autosaveToggle.checked
@@ -583,6 +607,8 @@ class SubtitleEditor extends HTMLElement {
     this.loadedTranscriptFormat = document.format
     this.loadedTranscriptPath = document.path
     this.manualSpeakers = []
+    this.cueSearchQuery = ''
+    if (this.cueSearchInput) this.cueSearchInput.value = ''
     this.hasUnsavedChanges = false
     this.changeRevision = 0
     this.lastAutosavedAt = null
@@ -1205,9 +1231,43 @@ class SubtitleEditor extends HTMLElement {
     })
   }
 
+  getVisibleCues() {
+    const query = this.cueSearchQuery.trim().toLowerCase()
+    if (!query) return this.cues
+
+    return this.cues.filter(cue => {
+      const searchableText = [cue?.text, cue?.speaker]
+        .filter(Boolean)
+        .join('\n')
+        .toLowerCase()
+
+      return searchableText.includes(query)
+    })
+  }
+
+  updateCueSearchCount(visibleCues) {
+    if (!this.cueSearchCount) return
+
+    const query = this.cueSearchQuery.trim()
+    if (!query) {
+      this.cueSearchCount.textContent = this.cues.length
+        ? `${this.cues.length} cues`
+        : ''
+      return
+    }
+
+    const cueLabel = visibleCues.length === 1 ? 'cue' : 'cues'
+    this.cueSearchCount.textContent = `${visibleCues.length} of ${this.cues.length} ${cueLabel}`
+  }
+
   renderCues() {
+    const visibleCues = this.getVisibleCues()
+    const isSearching = this.cueSearchQuery.trim().length > 0
+    this.updateCueSearchCount(visibleCues)
+
     this.cueList.data = {
-      cues: this.cues,
+      cues: visibleCues,
+      allowMerge: !isSearching,
       video: this.video,
       activeCue: this.activeCue,
       playbackCue: this.playbackCue,

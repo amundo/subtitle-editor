@@ -42,6 +42,7 @@ class CueListView extends HTMLElement {
   render() {
     const {
       cues = [],
+      allowMerge = true,
       video = null,
       activeCue = null,
       playbackCue = null,
@@ -58,7 +59,7 @@ class CueListView extends HTMLElement {
     this.playbackCueElement = null
 
     cues.forEach((cue, index) => {
-      if (index > 0) {
+      if (allowMerge && index > 0) {
         this.appendChild(this.createMergeCueRow(cues[index - 1], cue, handlers))
       }
 
