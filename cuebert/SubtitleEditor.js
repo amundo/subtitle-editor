@@ -1138,17 +1138,27 @@ class SubtitleEditor extends HTMLElement {
 
 
   setCueBoundary(cue, edge, time) {
+    const preview = this.getCueBoundaryPreview(cue, edge, time)
+    cue[preview.edge] = preview.time
+    return preview.edge
+  }
+
+  getCueBoundaryPreview(cue, edge, time) {
     const minCueDuration = 0.05
     const mediaDuration = this.transportController.getMediaDuration()
     const maxTime = mediaDuration || Math.max(cue.end, time, 0)
 
     if (edge === 'start') {
-      cue.start = this.clamp(time, 0, Math.max(0, cue.end - minCueDuration))
-      return 'start'
+      return {
+        edge: 'start',
+        time: this.clamp(time, 0, Math.max(0, cue.end - minCueDuration))
+      }
     }
 
-    cue.end = this.clamp(time, cue.start + minCueDuration, maxTime)
-    return 'end'
+    return {
+      edge: 'end',
+      time: this.clamp(time, cue.start + minCueDuration, maxTime)
+    }
   }
 
   clamp(value, min, max) {
@@ -1370,10 +1380,9 @@ class SubtitleEditor extends HTMLElement {
           this.transportController.updateUi()
         },
         onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
-          this.setCueBoundary(cue, edge, time)
-          cueEditor.updateTimeLabels()
-          cueEditor.renderWaveform()
-          this.transportController.updateUi()
+          cueEditor.updateBoundaryPreviewLabels(
+            this.getCueBoundaryPreview(cue, edge, time)
+          )
         },
         onWaveformBoundaryCommit: (cue, { edge, time }, cueEditor) => {
           const nextEdge = this.setCueBoundary(cue, edge, time)

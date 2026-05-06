@@ -234,11 +234,19 @@ class CueEditor extends HTMLElement {
 
   updateTimeLabels() {
     if (!this.#data) return
+    this.updateBoundaryPreviewLabels({})
+  }
+
+  updateBoundaryPreviewLabels({ edge = null, time = null } = {}) {
+    if (!this.#data) return
+    const start = edge === 'start' ? time : this.#data.start
+    const end = edge === 'end' ? time : this.#data.end
+
     if (this.startLabel) {
-      this.startLabel.textContent = this.formatTime(this.#data.start)
+      this.startLabel.textContent = this.formatTime(start)
     }
     if (this.endLabel) {
-      this.endLabel.textContent = this.formatTime(this.#data.end)
+      this.endLabel.textContent = this.formatTime(end)
     }
   }
 
