@@ -56,7 +56,7 @@
     },
 
     "version": {
-      "description": "Bump app version in config files",
+      "description": "Update app version in config files",
       "command": "deno run --allow-read --allow-write scripts/bump-version.js"
     },
 

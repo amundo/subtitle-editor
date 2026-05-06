@@ -66,6 +66,103 @@ cue-bert {
     box-shadow: 0 -1px 0 rgb(0 0 0 / 0.08);
   }
 
+  .shortcut-guide-button {
+    position: fixed;
+    right: 1.25rem;
+    bottom: 5.25rem;
+    z-index: 20;
+    inline-size: 2.35rem;
+    block-size: 2.35rem;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid #155e63;
+    border-radius: 999px;
+    background: #ffffff;
+    color: #155e63;
+    box-shadow: 0 0.35rem 1rem rgb(15 23 42 / 0.18);
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+  }
+
+  .shortcut-guide-button:hover {
+    background: #ecfdfd;
+  }
+
+  .shortcut-guide-dialog {
+    width: min(30rem, calc(100vw - 2rem));
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  .shortcut-guide-dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  .shortcut-guide-panel {
+    border: 1px solid #d8dee4;
+    border-radius: 0.45rem;
+    padding: 0.85rem;
+    background: #fff;
+    box-shadow: 0 1rem 2.5rem rgb(15 23 42 / 0.22);
+  }
+
+  .shortcut-guide-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .shortcut-guide-header button {
+    border: 1px solid #d0d7de;
+    border-radius: 999px;
+    background: #f6f8fa;
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .shortcut-list {
+    display: grid;
+    gap: 0.6rem;
+    margin: 0;
+  }
+
+  .shortcut-list div {
+    display: grid;
+    grid-template-columns: minmax(10rem, auto) minmax(0, 1fr);
+    gap: 0.8rem;
+    align-items: center;
+  }
+
+  .shortcut-list dt {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .shortcut-list dd {
+    margin: 0;
+    color: #374151;
+  }
+
+  .shortcut-list kbd {
+    min-inline-size: 1.65rem;
+    padding: 0.18rem 0.42rem;
+    border: 1px solid #d0d7de;
+    border-bottom-width: 2px;
+    border-radius: 0.3rem;
+    background: #f6f8fa;
+    color: #111827;
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: center;
+  }
+
   .transport-controls {
     display: grid;
     grid-template-columns: auto minmax(8rem, 1fr) auto auto minmax(4.5rem, 7rem);
@@ -421,6 +518,11 @@ cue-bert {
 
     .media-bar {
       gap: 0.4rem;
+    }
+
+    .shortcut-guide-button {
+      right: 1rem;
+      bottom: 6rem;
     }
 
     .transport-controls {

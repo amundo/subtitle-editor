@@ -194,6 +194,42 @@ class SubtitleEditor extends HTMLElement {
           </div>
         </footer>
 
+        <button
+          data-role="shortcutGuideBtn"
+          class="shortcut-guide-button"
+          type="button"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts"
+        >?</button>
+
+        <dialog data-role="shortcutGuideDialog" class="shortcut-guide-dialog">
+          <div class="shortcut-guide-panel">
+            <div class="shortcut-guide-header">
+              <strong>Keyboard Shortcuts</strong>
+              <button data-role="closeShortcutGuideBtn" type="button" aria-label="Close keyboard shortcuts">Close</button>
+            </div>
+            <dl class="shortcut-list">
+              <div>
+                <dt><kbd>Cmd</kbd><kbd>/</kbd></dt>
+                <dd>Focus cue search</dd>
+              </div>
+              <div>
+                <dt><kbd>Cmd</kbd><kbd>Enter</kbd></dt>
+                <dd>Play current cue while editing text</dd>
+              </div>
+              <div>
+                <dt><kbd>Cmd</kbd><kbd>Option</kbd><kbd>Down</kbd></dt>
+                <dd>Move to next visible cue text box</dd>
+              </div>
+              <div>
+                <dt><kbd>Cmd</kbd><kbd>Option</kbd><kbd>Up</kbd></dt>
+                <dd>Move to previous visible cue text box</dd>
+              </div>
+            </dl>
+            <small>Guess who loves you?</small>
+          </div>
+        </dialog>
+
         <dialog data-role="speakerDialog" class="speaker-dialog">
           <div class="speaker-panel">
             <div class="speaker-panel-header">
@@ -242,6 +278,9 @@ class SubtitleEditor extends HTMLElement {
     this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
     this.autosaveStatus = this.querySelector('[data-role="autosaveStatus"]')
     this.autosaveToggle = this.querySelector('[data-role="autosaveToggle"]')
+    this.shortcutGuideBtn = this.querySelector('[data-role="shortcutGuideBtn"]')
+    this.shortcutGuideDialog = this.querySelector('[data-role="shortcutGuideDialog"]')
+    this.closeShortcutGuideBtn = this.querySelector('[data-role="closeShortcutGuideBtn"]')
     this.editSpeakersBtn = this.querySelector('[data-role="editSpeakersBtn"]')
     this.speakerDialog = this.querySelector('[data-role="speakerDialog"]')
     this.closeSpeakerDialogBtn = this.querySelector('[data-role="closeSpeakerDialogBtn"]')
@@ -284,6 +323,7 @@ class SubtitleEditor extends HTMLElement {
     this.bindFileEvents()
     this.bindExportEvents()
     this.bindSpeakerEvents()
+    this.bindShortcutGuideEvents()
     this.transportController.bindTransportControls()
     this.bindPreferenceEvents()
     this.bindCueSearchEvents()
@@ -420,6 +460,26 @@ class SubtitleEditor extends HTMLElement {
     })
 
   }
+
+  bindShortcutGuideEvents() {
+    this.shortcutGuideBtn?.addEventListener('click', () => {
+      if (!this.shortcutGuideDialog) return
+
+      if (this.shortcutGuideDialog.open) {
+        this.shortcutGuideDialog.close()
+        return
+      }
+
+      this.shortcutGuideDialog.showModal()
+    })
+
+    this.closeShortcutGuideBtn?.addEventListener('click', () => {
+      if (this.shortcutGuideDialog?.open) {
+        this.shortcutGuideDialog.close()
+      }
+    })
+  }
+
   bindCueSearchEvents() {
     this.cueSearchInput?.addEventListener('input', () => {
       this.cueSearchQuery = this.cueSearchInput.value
