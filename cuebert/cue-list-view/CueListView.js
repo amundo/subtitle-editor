@@ -44,16 +44,13 @@ class CueListView extends HTMLElement {
       cues = [],
       allowMerge = true,
       video = null,
-      activeCue = null,
       playbackCue = null,
       speakers = [],
       envelope = null,
       frameDuration = null,
       formatTime = seconds => seconds.toFixed(3),
-      highlightedCues = [],
       handlers = {}
     } = this.#data
-    const highlightedCueSet = new Set(highlightedCues)
 
     this.innerHTML = ''
     this.cueElementByCue = new Map()
@@ -76,18 +73,9 @@ class CueListView extends HTMLElement {
 
       this.cueElementByCue.set(cue, cueEditor)
 
-      if (activeCue === cue || playbackCue === cue) {
-        cueEditor.classList.add('is-active')
-        this.activeCueElement = cueEditor
-      }
-
       if (playbackCue === cue) {
         cueEditor.classList.add('is-playback-active')
         this.playbackCueElement = cueEditor
-      }
-
-      if (highlightedCueSet.has(cue)) {
-        cueEditor.classList.add('is-search-match')
       }
 
       cueEditor.onPlayCue = selectedCue => {

@@ -355,12 +355,6 @@ cue-bert {
     white-space: nowrap;
   }
 
-  cue-editor.is-search-match {
-    outline: 2px solid #f2cc60;
-    outline-offset: 2px;
-    background: #fff8c5;
-  }
-
   .cue-list {
     display: block;
     border: 1px solid #d8dee4;

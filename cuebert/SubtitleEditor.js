@@ -7,6 +7,11 @@ import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { TransportController } from './services/TransportController.js'
 import { CueSearchController } from './services/CueSearchController.js'
+import {
+  deleteCue as deleteCueOperation,
+  mergeCues as mergeCuesOperation,
+  splitCue as splitCueOperation
+} from './services/CueOperations.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -36,7 +41,6 @@ class SubtitleEditor extends HTMLElement {
     this.cueSearchQuery = ''
     this.cueSearchMatchCase = false
     this.cueSearchWholeWords = false
-    this.cueSearchHighlightAll = false
 
     // autosave state
     this.autosaveEnabled = true
@@ -66,6 +70,7 @@ class SubtitleEditor extends HTMLElement {
     this.playbackCue = null
     this.playbackCueElement = null
     this.previewCueListeners = []
+    this.transportPlaybackHighlightActive = false
   }
 
   connectedCallback() {
@@ -141,10 +146,6 @@ class SubtitleEditor extends HTMLElement {
             <label class="cue-search-option">
               <input data-role="cueSearchWholeWords" type="checkbox">
               <span>Whole Words</span>
-            </label>
-            <label class="cue-search-option">
-              <input data-role="cueSearchHighlightAll" type="checkbox">
-              <span>Highlight All</span>
             </label>
             <span data-role="cueSearchCount" class="cue-search-count"></span>
           </div>
@@ -233,7 +234,6 @@ class SubtitleEditor extends HTMLElement {
     this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
     this.cueSearchMatchCaseInput = this.querySelector('[data-role="cueSearchMatchCase"]')
     this.cueSearchWholeWordsInput = this.querySelector('[data-role="cueSearchWholeWords"]')
-    this.cueSearchHighlightAllInput = this.querySelector('[data-role="cueSearchHighlightAll"]')
     this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
     this.saveBtn = this.querySelector('[data-role="saveBtn"]')
     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
@@ -403,10 +403,6 @@ class SubtitleEditor extends HTMLElement {
     })
     this.cueSearchWholeWordsInput?.addEventListener('change', () => {
       this.cueSearchWholeWords = this.cueSearchWholeWordsInput.checked
-      this.renderCues()
-    })
-    this.cueSearchHighlightAllInput?.addEventListener('change', () => {
-      this.cueSearchHighlightAll = this.cueSearchHighlightAllInput.checked
       this.renderCues()
     })
   }
@@ -989,17 +985,13 @@ class SubtitleEditor extends HTMLElement {
 
   setActiveCue(cue, element, options = {}) {
     this.activeCue = cue
-    if (this.activeCueElement && this.activeCueElement !== element) {
-      this.activeCueElement.classList.remove('is-active')
-    }
     this.activeCueElement = element
-    if (element) element.classList.add('is-active')
     if (options.scroll && element) {
       element.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
   }
 
-  setPlaybackCue(cue, source = 'playback') {
+  setPlaybackCue(cue, source = 'playback', options = {}) {
     if (this.playbackCue === cue) return
 
     const previousCue = this.playbackCue
@@ -1025,7 +1017,7 @@ class SubtitleEditor extends HTMLElement {
       detail: { cue, source },
       bubbles: true
     }))
-    this.setActiveCue(cue, element, { scroll: true })
+    this.setActiveCue(cue, element, { scroll: options.scroll })
   }
 
   clearPlaybackCue(cue, source = 'playback') {
@@ -1047,12 +1039,27 @@ class SubtitleEditor extends HTMLElement {
   }
 
   syncActiveCueToPlayback(source = 'playback') {
-    if (!this.video || this.video.paused || this.previewEnd !== null) return
+    this.updateTransportPlaybackHighlightState(source)
+    if (!this.video || this.previewEnd !== null) return
+    if (this.video.paused && source !== 'transport-seek') return
+    if (!this.transportPlaybackHighlightActive) return
 
     const currentCue = this.findCueAtTime(this.video.currentTime)
     if (currentCue) {
-      this.setPlaybackCue(currentCue, source)
+      this.setPlaybackCue(currentCue, source, { scroll: true })
     } else {
+      this.clearPlaybackCue(null, source)
+    }
+  }
+
+  updateTransportPlaybackHighlightState(source) {
+    if (source === 'transport-play' || source === 'transport-seek') {
+      this.transportPlaybackHighlightActive = true
+      return
+    }
+
+    if (source === 'cue-preview' || source === 'trackload') {
+      this.transportPlaybackHighlightActive = false
       this.clearPlaybackCue(null, source)
     }
   }
@@ -1081,7 +1088,7 @@ class SubtitleEditor extends HTMLElement {
 
       const onEnter = () => {
         if (this.previewEnd !== null) return
-        this.setPlaybackCue(cue, 'texttrack-enter')
+        this.syncActiveCueToPlayback('texttrack-enter')
       }
       const onExit = () => {
         this.clearPlaybackCue(cue, 'texttrack-exit')
@@ -1207,6 +1214,18 @@ class SubtitleEditor extends HTMLElement {
       : nextId
   }
 
+  splitCue(cue, selection = {}) {
+    splitCueOperation.call(this, cue, selection)
+  }
+
+  mergeCues(targetCue, mergedCue) {
+    mergeCuesOperation.call(this, targetCue, mergedCue)
+  }
+
+  deleteCue(cue) {
+    deleteCueOperation.call(this, cue)
+  }
+
   addSpeaker(speaker) {
     if (!this.speakerController.normalizeSpeaker(speaker)) return
 
@@ -1274,7 +1293,7 @@ class SubtitleEditor extends HTMLElement {
 
   getVisibleCues(searchMatchedCues = this.getSearchMatchedCues()) {
     const query = this.cueSearchQuery.trim()
-    if (!query || this.cueSearchHighlightAll) return this.cues
+    if (!query) return this.cues
 
     return searchMatchedCues
   }
@@ -1291,9 +1310,7 @@ class SubtitleEditor extends HTMLElement {
     }
 
     const matchLabel = matchedCues.length === 1 ? 'match' : 'matches'
-    this.cueSearchCount.textContent = this.cueSearchHighlightAll
-      ? `${matchedCues.length} ${matchLabel}`
-      : `${visibleCues.length} of ${this.cues.length} ${matchLabel}`
+    this.cueSearchCount.textContent = `${visibleCues.length} of ${this.cues.length} ${matchLabel}`
   }
 
   renderCues() {
@@ -1305,7 +1322,6 @@ class SubtitleEditor extends HTMLElement {
     this.cueList.data = {
       cues: visibleCues,
       allowMerge: !isSearching,
-      highlightedCues: this.cueSearchHighlightAll && isSearching ? matchedCues : [],
       video: this.video,
       activeCue: this.activeCue,
       playbackCue: this.playbackCue,

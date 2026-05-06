@@ -111,10 +111,6 @@ cue-editor {
     border: 1px solid #222;
   }
 
-  &.is-active {
-    box-shadow: 0 0 0 2px #6cb6ff;
-  }
-
   &.is-playback-active {
     background: #fffbea;
     box-shadow: 0 0 0 2px #f59e0b;

@@ -62,6 +62,7 @@ class TransportController {
 
     mediaPlayBtn?.addEventListener('click', () => {
       if (!this.video.src) return
+      this.onPlaybackSync('transport-play')
       if (this.video.paused) {
         this.video.play().catch(err => {
           console.error('Media playback failed:', err)
@@ -76,6 +77,7 @@ class TransportController {
       if (Number.isFinite(nextTime)) {
         this.video.currentTime = nextTime
         this.updateUi()
+        this.onPlaybackSync('transport-seek')
       }
     })
 
@@ -143,6 +145,7 @@ class TransportController {
   playTimeRange(start, end) {
     if (!this.video || !this.video.src) return
 
+    this.onPlaybackSync('cue-preview')
     this.setPreviewEnd(Math.max(start, end))
     this.video.currentTime = Math.max(0, start)
     this.updateUi()
