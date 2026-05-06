@@ -307,6 +307,7 @@ cue-bert {
 
   .cue-search-row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     gap: 0.75rem;
@@ -327,6 +328,19 @@ cue-bert {
     font-weight: 600;
   }
 
+  .cue-search-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #57606a;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .cue-search-option input {
+    margin: 0;
+  }
+
   .cue-search-input {
     flex: 1;
     padding: 0.45rem 0.65rem;
@@ -339,6 +353,12 @@ cue-bert {
     color: #57606a;
     font-size: 0.85rem;
     white-space: nowrap;
+  }
+
+  cue-editor.is-search-match {
+    outline: 2px solid #f2cc60;
+    outline-offset: 2px;
+    background: #fff8c5;
   }
 
   .cue-list {

@@ -64,6 +64,12 @@ class CueEditor extends HTMLElement {
             ${speakerLabelMarkup}
           </button>
 
+          <button type="button" class="time-button play-button"
+                  data-role="playCue"
+                  title="Play this cue">
+            ▶
+          </button>
+          
           <span class="cue-meta-spacer"></span>
 
           <button class="cue-action-button" data-role="splitCue" type="button"
@@ -115,11 +121,6 @@ class CueEditor extends HTMLElement {
             +
           </button>
 
-          <button type="button" class="time-button play-button"
-                  data-role="playCue"
-                  title="Play this cue">
-            ▶
-          </button>
         </div>
 
         <textarea class="cue-text" data-role="text">${text ?? ''}</textarea>

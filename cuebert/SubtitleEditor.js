@@ -6,6 +6,7 @@ import { AutosaveController } from './services/AutosaveController.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { TransportController } from './services/TransportController.js'
+import { CueSearchController } from './services/CueSearchController.js'
 
 class SubtitleEditor extends HTMLElement {
   constructor() {
@@ -33,6 +34,9 @@ class SubtitleEditor extends HTMLElement {
     this.minCueFontSizeEm = 0.6
     this.maxCueFontSizeEm = 2
     this.cueSearchQuery = ''
+    this.cueSearchMatchCase = false
+    this.cueSearchWholeWords = false
+    this.cueSearchHighlightAll = false
 
     // autosave state
     this.autosaveEnabled = true
@@ -47,6 +51,7 @@ class SubtitleEditor extends HTMLElement {
     this.autosaveController = new AutosaveController()
     this.speakerController = new SpeakerController()
     this.transcriptDocument = new TranscriptDocument()
+    this.cueSearchController = new CueSearchController()
 
     // audio analysis state
     this.audioBuffer = null
@@ -128,6 +133,18 @@ class SubtitleEditor extends HTMLElement {
                 placeholder="Search text or speaker…"
                 autocomplete="off"
               >
+            </label>
+            <label class="cue-search-option">
+              <input data-role="cueSearchMatchCase" type="checkbox">
+              <span>Match Case</span>
+            </label>
+            <label class="cue-search-option">
+              <input data-role="cueSearchWholeWords" type="checkbox">
+              <span>Whole Words</span>
+            </label>
+            <label class="cue-search-option">
+              <input data-role="cueSearchHighlightAll" type="checkbox">
+              <span>Highlight All</span>
             </label>
             <span data-role="cueSearchCount" class="cue-search-count"></span>
           </div>
@@ -214,6 +231,9 @@ class SubtitleEditor extends HTMLElement {
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
     this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
+    this.cueSearchMatchCaseInput = this.querySelector('[data-role="cueSearchMatchCase"]')
+    this.cueSearchWholeWordsInput = this.querySelector('[data-role="cueSearchWholeWords"]')
+    this.cueSearchHighlightAllInput = this.querySelector('[data-role="cueSearchHighlightAll"]')
     this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
     this.saveBtn = this.querySelector('[data-role="saveBtn"]')
     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
@@ -375,6 +395,18 @@ class SubtitleEditor extends HTMLElement {
   bindCueSearchEvents() {
     this.cueSearchInput?.addEventListener('input', () => {
       this.cueSearchQuery = this.cueSearchInput.value
+      this.renderCues()
+    })
+    this.cueSearchMatchCaseInput?.addEventListener('change', () => {
+      this.cueSearchMatchCase = this.cueSearchMatchCaseInput.checked
+      this.renderCues()
+    })
+    this.cueSearchWholeWordsInput?.addEventListener('change', () => {
+      this.cueSearchWholeWords = this.cueSearchWholeWordsInput.checked
+      this.renderCues()
+    })
+    this.cueSearchHighlightAllInput?.addEventListener('change', () => {
+      this.cueSearchHighlightAll = this.cueSearchHighlightAllInput.checked
       this.renderCues()
     })
   }
@@ -1231,21 +1263,23 @@ class SubtitleEditor extends HTMLElement {
     })
   }
 
-  getVisibleCues() {
-    const query = this.cueSearchQuery.trim().toLowerCase()
-    if (!query) return this.cues
-
-    return this.cues.filter(cue => {
-      const searchableText = [cue?.text, cue?.speaker]
-        .filter(Boolean)
-        .join('\n')
-        .toLowerCase()
-
-      return searchableText.includes(query)
+  getSearchMatchedCues() {
+    return this.cueSearchController.getMatchedCues({
+      cues: this.cues,
+      query: this.cueSearchQuery,
+      matchCase: this.cueSearchMatchCase,
+      wholeWords: this.cueSearchWholeWords
     })
   }
 
-  updateCueSearchCount(visibleCues) {
+  getVisibleCues(searchMatchedCues = this.getSearchMatchedCues()) {
+    const query = this.cueSearchQuery.trim()
+    if (!query || this.cueSearchHighlightAll) return this.cues
+
+    return searchMatchedCues
+  }
+
+  updateCueSearchCount({ visibleCues, matchedCues }) {
     if (!this.cueSearchCount) return
 
     const query = this.cueSearchQuery.trim()
@@ -1256,18 +1290,22 @@ class SubtitleEditor extends HTMLElement {
       return
     }
 
-    const cueLabel = visibleCues.length === 1 ? 'cue' : 'cues'
-    this.cueSearchCount.textContent = `${visibleCues.length} of ${this.cues.length} ${cueLabel}`
+    const matchLabel = matchedCues.length === 1 ? 'match' : 'matches'
+    this.cueSearchCount.textContent = this.cueSearchHighlightAll
+      ? `${matchedCues.length} ${matchLabel}`
+      : `${visibleCues.length} of ${this.cues.length} ${matchLabel}`
   }
 
   renderCues() {
-    const visibleCues = this.getVisibleCues()
+    const matchedCues = this.getSearchMatchedCues()
+    const visibleCues = this.getVisibleCues(matchedCues)
     const isSearching = this.cueSearchQuery.trim().length > 0
-    this.updateCueSearchCount(visibleCues)
+    this.updateCueSearchCount({ visibleCues, matchedCues })
 
     this.cueList.data = {
       cues: visibleCues,
       allowMerge: !isSearching,
+      highlightedCues: this.cueSearchHighlightAll && isSearching ? matchedCues : [],
       video: this.video,
       activeCue: this.activeCue,
       playbackCue: this.playbackCue,

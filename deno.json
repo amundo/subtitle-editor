@@ -15,9 +15,14 @@
       "command": "deno task tauri build"
     },
 
-    "build-debug": {
+    "build:debug": {
       "description": "Build debug version of Tauri app",
       "command": "deno task tauri build --debug"
+    },
+
+    "build:all": {
+      "description": "Build release and debug DMGs",
+      "command": "deno task build && deno task build-debug"
     },
 
     "run:binary": {

@@ -50,8 +50,10 @@ class CueListView extends HTMLElement {
       envelope = null,
       frameDuration = null,
       formatTime = seconds => seconds.toFixed(3),
+      highlightedCues = [],
       handlers = {}
     } = this.#data
+    const highlightedCueSet = new Set(highlightedCues)
 
     this.innerHTML = ''
     this.cueElementByCue = new Map()
@@ -82,6 +84,10 @@ class CueListView extends HTMLElement {
       if (playbackCue === cue) {
         cueEditor.classList.add('is-playback-active')
         this.playbackCueElement = cueEditor
+      }
+
+      if (highlightedCueSet.has(cue)) {
+        cueEditor.classList.add('is-search-match')
       }
 
       cueEditor.onPlayCue = selectedCue => {
