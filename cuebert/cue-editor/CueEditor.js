@@ -16,13 +16,10 @@ class CueEditor extends HTMLElement {
 
     // callbacks wired by SubtitleEditor
     this.onPlayCue = null
-    this.onSnapStartToNow = null
-    this.onSnapEndToNow = null
-    this.onExtendStartBackward = null
-    this.onExtendEndForward = null
     this.onSetSpeaker = null
     this.onSplitCue = null
     this.onDeleteCue = null
+    this.onNavigateCue = null
     this.onWaveformSeek = null
     this.onWaveformBoundaryChange = null
     this.onWaveformBoundaryCommit = null
@@ -84,41 +81,17 @@ class CueEditor extends HTMLElement {
 
         <div class="cue-time-row">
           <button type="button" class="time-button"
-                  data-role="extendStart"
-                  title="Extend start backward one lump">
-            ◂
-          </button>
-
-          <button type="button" class="time-button"
                   data-role="jumpStart"
                   title="Jump video to start time">
             start: <span data-role="startLabel"></span>
           </button>
 
-          <button type="button" class="time-button"
-                  data-role="snapStart"
-                  title="Set start to current video time">
-            🎯
-          </button>
-
           <span class="time-row-spacer"></span>
-
-          <button type="button" class="time-button"
-                  data-role="snapEnd"
-                  title="Set end to current video time">
-            🎯
-          </button>
 
           <button type="button" class="time-button"
                   data-role="jumpEnd"
                   title="Jump video to end time">
             end: <span data-role="endLabel"></span>
-          </button>
-
-          <button type="button" class="time-button"
-                  data-role="extendEnd"
-                  title="Extend end forward one lump">
-            +
           </button>
 
         </div>
@@ -140,6 +113,16 @@ class CueEditor extends HTMLElement {
     this.speakerPill = this.querySelector('[data-role="speakerPill"]')
   }
 
+  updateSpeakerPill() {
+    if (!this.speakerPill || !this.#data) return
+
+    const speaker = this.#data.speaker
+    this.speakerPill.textContent = speaker || 'No speaker'
+    this.speakerPill.className = speaker
+      ? 'speaker-pill'
+      : 'speaker-pill is-empty'
+  }
+
   bindEvents() {
     this.querySelector('[data-role="jumpStart"]').addEventListener('click', () => {
       if (!this.video) return
@@ -153,34 +136,6 @@ class CueEditor extends HTMLElement {
       this.video.play()
     })
 
-    const snapStartBtn = this.querySelector('[data-role="snapStart"]')
-    if (snapStartBtn) {
-      snapStartBtn.addEventListener('click', () => {
-        if (this.onSnapStartToNow) this.onSnapStartToNow()
-      })
-    }
-
-    const snapEndBtn = this.querySelector('[data-role="snapEnd"]')
-    if (snapEndBtn) {
-      snapEndBtn.addEventListener('click', () => {
-        if (this.onSnapEndToNow) this.onSnapEndToNow()
-      })
-    }
-
-    const extendStartBtn = this.querySelector('[data-role="extendStart"]')
-    if (extendStartBtn) {
-      extendStartBtn.addEventListener('click', () => {
-        if (this.onExtendStartBackward) this.onExtendStartBackward()
-      })
-    }
-
-    const extendEndBtn = this.querySelector('[data-role="extendEnd"]')
-    if (extendEndBtn) {
-      extendEndBtn.addEventListener('click', () => {
-        if (this.onExtendEndForward) this.onExtendEndForward()
-      })
-    }
-
     const playBtn = this.querySelector('[data-role="playCue"]')
     if (playBtn) {
       playBtn.addEventListener('click', () => {
@@ -191,6 +146,10 @@ class CueEditor extends HTMLElement {
     this.textarea.addEventListener('input', () => {
       this.#data.text = this.textarea.value
       this.dispatchEvent(new CustomEvent('cuechange'))
+    })
+
+    this.textarea.addEventListener('keydown', event => {
+      this.handleTextKeydown(event)
     })
 
     if (this.speakerPill) {
@@ -230,6 +189,33 @@ class CueEditor extends HTMLElement {
       if (!window.confirm('Delete this cue? This cannot be undone.')) return
       if (this.onDeleteCue) this.onDeleteCue()
     })
+  }
+
+  handleTextKeydown(event) {
+    if (event.key === 'Enter' && event.metaKey && !event.altKey && !event.ctrlKey) {
+      event.preventDefault()
+      if (this.onPlayCue) this.onPlayCue(this.#data)
+      return
+    }
+
+    if (
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      event.metaKey &&
+      event.altKey &&
+      !event.ctrlKey
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.onNavigateCue?.(event.key === 'ArrowDown' ? 1 : -1)
+    }
+  }
+
+  focusText() {
+    if (!this.textarea) return
+
+    this.textarea.focus({ preventScroll: true })
+    const textLength = this.textarea.value.length
+    this.textarea.setSelectionRange(textLength, textLength)
   }
 
   updateTimeLabels() {

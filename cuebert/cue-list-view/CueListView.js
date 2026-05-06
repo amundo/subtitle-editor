@@ -82,22 +82,6 @@ class CueListView extends HTMLElement {
         handlers.onPlayCue?.(selectedCue, cueEditor)
       }
 
-      cueEditor.onSnapStartToNow = () => {
-        handlers.onSnapStartToNow?.(cue, cueEditor)
-      }
-
-      cueEditor.onSnapEndToNow = () => {
-        handlers.onSnapEndToNow?.(cue, cueEditor)
-      }
-
-      cueEditor.onExtendStartBackward = () => {
-        handlers.onExtendStartBackward?.(cue, cueEditor)
-      }
-
-      cueEditor.onExtendEndForward = () => {
-        handlers.onExtendEndForward?.(cue, cueEditor)
-      }
-
       cueEditor.onSetSpeaker = nextSpeaker => {
         handlers.onSetSpeaker?.(cue, nextSpeaker, cueEditor)
       }
@@ -108,6 +92,10 @@ class CueListView extends HTMLElement {
 
       cueEditor.onDeleteCue = () => {
         handlers.onDeleteCue?.(cue, cueEditor)
+      }
+
+      cueEditor.onNavigateCue = direction => {
+        handlers.onNavigateCue?.(cue, direction, cueEditor)
       }
 
       cueEditor.onWaveformSeek = time => {

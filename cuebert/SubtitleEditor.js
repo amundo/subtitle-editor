@@ -33,6 +33,7 @@ class SubtitleEditor extends HTMLElement {
     // preview/playback state
     this.previewEnd = null
     this.previewTrackUrl = null
+    this.previewTrackRefreshTimer = null
 
     // display preferences
     this.cueFontSizeEm = 1
@@ -61,7 +62,6 @@ class SubtitleEditor extends HTMLElement {
     this.audioBuffer = null
     this.envelope = null
     this.frameDuration = null
-    this.valleys = null
 
     // cue focus/playback UI state
     this.activeCue = null
@@ -87,6 +87,7 @@ class SubtitleEditor extends HTMLElement {
 
   disconnectedCallback() {
     this.cancelScheduledAutosave()
+    this.cancelScheduledPreviewTrackRefresh()
     this.clearPreviewCueListeners()
     this.revokePreviewTrackUrl()
   }
@@ -128,7 +129,7 @@ class SubtitleEditor extends HTMLElement {
               <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
-          <div class="cue-search-row">
+          <div class="cue-search-row" data-role="cueSearchRow">
             <label class="cue-search-label">
               <span>Search cues</span>
               <input
@@ -231,6 +232,7 @@ class SubtitleEditor extends HTMLElement {
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
     this.cueList = this.querySelector('[data-role="cueList"]')
+    this.cueSearchRow = this.querySelector('[data-role="cueSearchRow"]')
     this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
     this.cueSearchMatchCaseInput = this.querySelector('[data-role="cueSearchMatchCase"]')
     this.cueSearchWholeWordsInput = this.querySelector('[data-role="cueSearchWholeWords"]')
@@ -285,8 +287,34 @@ class SubtitleEditor extends HTMLElement {
     this.transportController.bindTransportControls()
     this.bindPreferenceEvents()
     this.bindCueSearchEvents()
+    this.bindKeyboardEvents()
 
     this.transportController.updateUi()
+  }
+
+  bindKeyboardEvents() {
+    this.addEventListener('keydown', event => {
+      if (
+        event.code !== 'Slash' ||
+        !event.metaKey ||
+        event.altKey ||
+        event.ctrlKey
+      ) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+      this.focusCueSearch()
+    })
+  }
+
+  focusCueSearch() {
+    if (!this.cueSearchInput) return
+
+    this.cueSearchRow?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+    this.cueSearchInput.focus({ preventScroll: true })
+    this.cueSearchInput.select()
   }
 
   bindFileEvents() {
@@ -455,12 +483,11 @@ class SubtitleEditor extends HTMLElement {
 
     this.audioBuffer = audioBuffer
 
-    const { envelope, frameDuration, valleys } =
-      this.buildEnvelopeAndValleys(audioBuffer)
+    const { envelope, frameDuration } =
+      this.buildEnvelope(audioBuffer)
 
     this.envelope = envelope
     this.frameDuration = frameDuration
-    this.valleys = valleys
 
     // re-render cues so they can show waveforms
     if (this.cues.length) {
@@ -468,7 +495,7 @@ class SubtitleEditor extends HTMLElement {
     }
   }
 
-  buildEnvelopeAndValleys(audioBuffer) {
+  buildEnvelope(audioBuffer) {
     const channelData = audioBuffer.getChannelData(0)
     const sampleRate = audioBuffer.sampleRate
     const windowSize = 2048 // samples per envelope frame
@@ -486,35 +513,8 @@ class SubtitleEditor extends HTMLElement {
       envelope.push(rms)
     }
 
-    // very simple valley detection on the smoothed envelope
-    const valleys = []
-    for (let i = 1; i < envelope.length - 1; i++) {
-      if (envelope[i] < envelope[i - 1] && envelope[i] <= envelope[i + 1]) {
-        valleys.push(i)
-      }
-    }
-
     const frameDuration = windowSize / sampleRate
-    return { envelope, frameDuration, valleys }
-  }
-
-  findNextValleyTime(afterTime) {
-    if (!this.valleys || !this.frameDuration) return afterTime
-    const startIndex = Math.floor(afterTime / this.frameDuration)
-    const idx = this.valleys.find(i => i > startIndex)
-    return idx != null ? idx * this.frameDuration : afterTime
-  }
-
-  findPrevValleyTime(beforeTime) {
-    if (!this.valleys || !this.frameDuration) return beforeTime
-    const startIndex = Math.floor(beforeTime / this.frameDuration)
-    for (let k = this.valleys.length - 1; k >= 0; k--) {
-      const i = this.valleys[k]
-      if (i * this.frameDuration < beforeTime && i < startIndex) {
-        return i * this.frameDuration
-      }
-    }
-    return beforeTime
+    return { envelope, frameDuration }
   }
 
   // ---------- time helpers ----------
@@ -662,6 +662,7 @@ class SubtitleEditor extends HTMLElement {
 
   refreshPreviewTrack() {
     if (!this.previewTrack) return
+    this.previewTrackRefreshTimer = null
 
     this.clearPreviewCueListeners()
     const vtt = this.transcriptDocument.buildVttContents(this.cues)
@@ -677,10 +678,25 @@ class SubtitleEditor extends HTMLElement {
     }
   }
 
+  schedulePreviewTrackRefresh() {
+    if (this.previewTrackRefreshTimer) return
+
+    this.previewTrackRefreshTimer = window.setTimeout(() => {
+      this.refreshPreviewTrack()
+    }, 0)
+  }
+
+  cancelScheduledPreviewTrackRefresh() {
+    if (!this.previewTrackRefreshTimer) return
+
+    window.clearTimeout(this.previewTrackRefreshTimer)
+    this.previewTrackRefreshTimer = null
+  }
+
   markDirty() {
     this.hasUnsavedChanges = true
     this.changeRevision++
-    this.refreshPreviewTrack()
+    this.schedulePreviewTrackRefresh()
     this.scheduleAutosave()
     this.updateAutosaveStatus()
   }
@@ -991,6 +1007,26 @@ class SubtitleEditor extends HTMLElement {
     }
   }
 
+  focusCueText(cue, options = {}) {
+    const cueEditor = this.cueElementByCue.get(cue)
+    if (!cueEditor) return false
+
+    this.setActiveCue(cue, cueEditor, options)
+    cueEditor.focusText?.()
+    return true
+  }
+
+  navigateCueText(cue, direction) {
+    const visibleCues = this.getVisibleCues()
+    const currentIndex = visibleCues.indexOf(cue)
+    if (currentIndex === -1) return
+
+    const nextCue = visibleCues[currentIndex + direction]
+    if (!nextCue) return
+
+    this.focusCueText(nextCue, { scroll: true })
+  }
+
   setPlaybackCue(cue, source = 'playback', options = {}) {
     if (this.playbackCue === cue) return
 
@@ -1129,10 +1165,31 @@ class SubtitleEditor extends HTMLElement {
     this.afterCueChange()
   }
 
-  setCueSpeaker(cue, speaker) {
+  setCueSpeaker(cue, speaker, cueEditor = null) {
+    const previousSpeakers = this.getUniqueSpeakers()
     if (!this.speakerController.setCueSpeaker(cue, speaker)) return
 
-    this.afterCueChange()
+    const nextSpeakers = this.getUniqueSpeakers()
+    this.updateRenderedSpeakerOptions(nextSpeakers)
+    cueEditor?.updateSpeakerPill?.()
+
+    if (this.haveSpeakersChanged(previousSpeakers, nextSpeakers)) {
+      this.renderSpeakerEditor()
+    }
+
+    this.markDirty()
+  }
+
+  updateRenderedSpeakerOptions(speakers) {
+    this.cueElementByCue?.forEach(cueEditor => {
+      cueEditor.speakerOptions = speakers
+    })
+  }
+
+  haveSpeakersChanged(previousSpeakers, nextSpeakers) {
+    if (previousSpeakers.length !== nextSpeakers.length) return true
+
+    return previousSpeakers.some((speaker, index) => speaker !== nextSpeakers[index])
   }
 
 
@@ -1343,32 +1400,17 @@ class SubtitleEditor extends HTMLElement {
         onPlayCue: cue => {
           this.transportController.playTimeRange(cue.start, cue.end)
         },
-        onSnapStartToNow: cue => {
-          cue.start = this.video.currentTime
-          if (cue.start > cue.end) cue.start = cue.end
-          this.afterCueChange({ speakersChanged: false })
-        },
-        onSnapEndToNow: cue => {
-          cue.end = this.video.currentTime
-          if (cue.end < cue.start) cue.end = cue.start
-          this.afterCueChange({ speakersChanged: false })
-        },
-        onExtendStartBackward: cue => {
-          cue.start = this.findPrevValleyTime(cue.start)
-          this.afterCueChange({ speakersChanged: false })
-        },
-        onExtendEndForward: cue => {
-          cue.end = this.findNextValleyTime(cue.end)
-          this.afterCueChange({ speakersChanged: false })
-        },
-        onSetSpeaker: (cue, nextSpeaker) => {
-          this.setCueSpeaker(cue, nextSpeaker)
+        onSetSpeaker: (cue, nextSpeaker, cueEditor) => {
+          this.setCueSpeaker(cue, nextSpeaker, cueEditor)
         },
         onSplitCue: (cue, selection) => {
           this.splitCue(cue, selection)
         },
         onDeleteCue: cue => {
           this.deleteCue(cue)
+        },
+        onNavigateCue: (cue, direction) => {
+          this.navigateCueText(cue, direction)
         },
         onWaveformSeek: (cue, time, cueEditor) => {
           this.setActiveCue(cue, cueEditor)
