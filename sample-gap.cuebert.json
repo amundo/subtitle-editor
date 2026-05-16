@@ -1,0 +1,121 @@
+{
+  "segments": [
+    {
+      "id": 1,
+      "seek": 1104,
+      "start": 0.56,
+      "end": 3.04,
+      "text": " This is a fascinating audio recording.",
+      "tokens": [
+        50365,
+        639,
+        307,
+        257,
+        10343,
+        6278,
+        6613,
+        13,
+        50489
+      ],
+      "temperature": 0,
+      "avg_logprob": -0.18902761285955255,
+      "compression_ratio": 1.2247191011235956,
+      "no_speech_prob": 9.722864874328607e-13,
+      "words": [
+        {
+          "start": 0.56,
+          "end": 1.06,
+          "word": " This",
+          "probability": 0.981194794178009
+        },
+        {
+          "start": 1.06,
+          "end": 1.2,
+          "word": " is",
+          "probability": 0.999002993106842
+        },
+        {
+          "start": 1.2,
+          "end": 1.34,
+          "word": " a",
+          "probability": 0.9980278611183167
+        },
+        {
+          "start": 1.34,
+          "end": 1.84,
+          "word": " fascinating",
+          "probability": 0.9996117949485779
+        },
+        {
+          "start": 1.84,
+          "end": 2.38,
+          "word": " audio",
+          "probability": 0.99928879737854
+        },
+        {
+          "start": 2.38,
+          "end": 3.04,
+          "word": " recording.",
+          "probability": 0.9997732043266296
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "start": 3.04,
+      "end": 8.28,
+      "text": ""
+    },
+    {
+      "id": 3,
+      "seek": 1104,
+      "start": 8.28,
+      "end": 9.68,
+      "text": " This is the end.",
+      "tokens": [
+        50773,
+        639,
+        307,
+        264,
+        917,
+        13,
+        50823
+      ],
+      "temperature": 0,
+      "avg_logprob": -0.18902761285955255,
+      "compression_ratio": 1.2247191011235956,
+      "no_speech_prob": 9.722864874328607e-13,
+      "words": [
+        {
+          "start": 8.28,
+          "end": 9.02,
+          "word": " This",
+          "probability": 0.996425211429596
+        },
+        {
+          "start": 9.02,
+          "end": 9.18,
+          "word": " is",
+          "probability": 0.9999192953109741
+        },
+        {
+          "start": 9.18,
+          "end": 9.36,
+          "word": " the",
+          "probability": 0.9970567226409912
+        },
+        {
+          "start": 9.36,
+          "end": 9.68,
+          "word": " end.",
+          "probability": 0.9997151494026184
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "media": null,
+    "speakers": [],
+    "title": "sample-gap"
+  }
+}

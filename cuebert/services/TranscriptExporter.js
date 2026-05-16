@@ -114,6 +114,7 @@ function buildAtrainJson(cues, sourceData, {
 function formatCueTextForExport(cue) {
   const text = (cue.text || '').trim()
   const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
+  if (!text && cue.generatedFromAudioGap) return '\u200B'
   if (!speaker || !text) return text
 
   const speakerPrefix = `[${speaker}] `

@@ -3,6 +3,7 @@ import './cue-editor/CueEditor.js'
 import './cue-list-view/CueListView.js'
 import { formatTime, parseTime } from './services/time.js'
 import { AutosaveController } from './services/AutosaveController.js'
+import { buildEnvelope, getAudibleCueGaps } from './services/AudioAnalyzer.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { TransportController } from './services/TransportController.js'
@@ -29,6 +30,7 @@ class SubtitleEditor extends HTMLElement {
     // media source state
     this.mediaLoadedFromPath = null
     this.autoLoadedMediaPath = null
+    this.mediaLoadedManually = false
 
     // preview/playback state
     this.previewEnd = null
@@ -62,6 +64,7 @@ class SubtitleEditor extends HTMLElement {
     this.audioBuffer = null
     this.envelope = null
     this.frameDuration = null
+    this.filledAudibleGapsSignature = ''
 
     // cue focus/playback UI state
     this.activeCue = null
@@ -363,6 +366,7 @@ class SubtitleEditor extends HTMLElement {
       if (!file) return
       this.mediaLoadedFromPath = this.getFilePath(file)
       this.autoLoadedMediaPath = null
+      this.mediaLoadedManually = true
       this.video.src = URL.createObjectURL(file)
       this.transportController.updateUi()
       this.ensurePreviewTrackShowing()
@@ -544,10 +548,12 @@ class SubtitleEditor extends HTMLElement {
     this.audioBuffer = audioBuffer
 
     const { envelope, frameDuration } =
-      this.buildEnvelope(audioBuffer)
+      buildEnvelope(audioBuffer)
 
     this.envelope = envelope
     this.frameDuration = frameDuration
+
+    this.fillAudibleCueGaps()
 
     // re-render cues so they can show waveforms
     if (this.cues.length) {
@@ -555,26 +561,57 @@ class SubtitleEditor extends HTMLElement {
     }
   }
 
-  buildEnvelope(audioBuffer) {
-    const channelData = audioBuffer.getChannelData(0)
-    const sampleRate = audioBuffer.sampleRate
-    const windowSize = 2048 // samples per envelope frame
+  fillAudibleCueGaps() {
+    if (!this.cues.length || !this.envelope || !this.frameDuration) return 0
 
-    const envelope = []
-    for (let i = 0; i < channelData.length; i += windowSize) {
-      let sum = 0
-      let count = 0
-      for (let j = i; j < i + windowSize && j < channelData.length; j++) {
-        const v = channelData[j]
-        sum += v * v
-        count++
-      }
-      const rms = Math.sqrt(sum / count)
-      envelope.push(rms)
+    const signature = this.getAudibleGapFillSignature()
+    if (signature === this.filledAudibleGapsSignature) return 0
+
+    const gaps = getAudibleCueGaps(this.cues, {
+      envelope: this.envelope,
+      frameDuration: this.frameDuration
+    })
+    if (!gaps.length) {
+      this.filledAudibleGapsSignature = signature
+      return 0
     }
 
-    const frameDuration = windowSize / sampleRate
-    return { envelope, frameDuration }
+    const gapCues = gaps.map((gap, index) => ({
+      id: this.createCueId(gap.previousCue.id, `gap-${index + 1}`),
+      start: gap.start,
+      end: gap.end,
+      text: '',
+      speaker: null,
+      sourceSegmentIds: [],
+      generatedFromAudioGap: true
+    }))
+
+    this.cues = [...this.cues, ...gapCues]
+      .sort((firstCue, secondCue) => {
+        if (firstCue.start !== secondCue.start) {
+          return firstCue.start - secondCue.start
+        }
+        return firstCue.end - secondCue.end
+      })
+
+    this.filledAudibleGapsSignature = this.getAudibleGapFillSignature()
+    this.markDirty()
+
+    window.cuebertLog?.('info', 'filled-audible-cue-gaps', {
+      insertedCueCount: gapCues.length
+    })
+
+    return gapCues.length
+  }
+
+  getAudibleGapFillSignature() {
+    return JSON.stringify(
+      this.cues.map(cue => [
+        cue.start,
+        cue.end,
+        cue.generatedFromAudioGap === true
+      ])
+    )
   }
 
   // ---------- time helpers ----------
@@ -608,16 +645,25 @@ class SubtitleEditor extends HTMLElement {
 
   async loadMatchingMediaForTranscript(transcriptPath) {
     if (!transcriptPath || !this.canFindMatchingMedia()) return
+    if (this.mediaLoadedManually) {
+      this.fillAudibleCueGaps()
+      return
+    }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
 
     const mediaPath = await window.__TAURI__.core.invoke('find_matching_media', {
       transcriptPath
     })
-    if (!mediaPath || mediaPath === this.mediaLoadedFromPath) return
+    if (!mediaPath) return
+    if (mediaPath === this.mediaLoadedFromPath) {
+      this.fillAudibleCueGaps()
+      return
+    }
 
     await this.loadMediaFromPath(mediaPath)
     this.autoLoadedMediaPath = mediaPath
     this.mediaLoadedFromPath = mediaPath
+    this.mediaLoadedManually = false
     this.updateMediaLoadControlVisibility()
     window.cuebertLog?.('info', 'auto-loaded-matching-media', {
       transcriptPath,
@@ -627,6 +673,10 @@ class SubtitleEditor extends HTMLElement {
 
   async loadMediaForTranscript(transcriptPath, sourceData) {
     if (!this.canFindMatchingMedia()) return
+    if (this.mediaLoadedManually) {
+      this.fillAudibleCueGaps()
+      return
+    }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
 
     const metadataMediaPath = this.getTranscriptMetadataMediaPath(sourceData)
@@ -635,6 +685,7 @@ class SubtitleEditor extends HTMLElement {
         await this.loadMediaFromPath(metadataMediaPath)
         this.autoLoadedMediaPath = metadataMediaPath
         this.mediaLoadedFromPath = metadataMediaPath
+        this.mediaLoadedManually = false
         this.updateMediaLoadControlVisibility()
         window.cuebertLog?.('info', 'loaded-transcript-metadata-media', {
           transcriptPath,
@@ -651,27 +702,55 @@ class SubtitleEditor extends HTMLElement {
 
   async loadMediaFromPath(mediaPath) {
     const mediaUrl = window.__TAURI__.core.convertFileSrc(mediaPath)
-    let blob = null
-
-    try {
-      const response = await fetch(mediaUrl)
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
-      blob = await response.blob()
-    } catch (err) {
-      this.video.removeAttribute('src')
-      this.transportController.updateUi()
-      throw err
-    }
 
     this.video.src = mediaUrl
     this.transportController.updateUi()
     this.ensurePreviewTrackShowing()
 
     try {
-      await this.initAudioAnalysis(blob)
+      const blob = await this.getMediaAnalysisBlob(mediaPath, mediaUrl)
+      if (blob) await this.initAudioAnalysis(blob)
     } catch (err) {
       console.warn('Auto-loaded media is playable, but waveform analysis failed:', err)
     }
+  }
+
+  async getMediaAnalysisBlob(mediaPath, mediaUrl) {
+    if (mediaUrl.startsWith('asset://')) {
+      return this.readMediaBlobFromPath(mediaPath)
+    }
+
+    const response = await fetch(mediaUrl)
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    return response.blob()
+  }
+
+  async readMediaBlobFromPath(mediaPath) {
+    const bytes = await window.__TAURI__?.fs?.readFile?.(mediaPath)
+    if (!bytes) return null
+
+    return new Blob([bytes], { type: this.getMediaMimeType(mediaPath) })
+  }
+
+  getMediaMimeType(path) {
+    const extension = path.split('.').pop()?.toLowerCase()
+    const mimeTypes = {
+      aac: 'audio/aac',
+      aiff: 'audio/aiff',
+      avi: 'video/x-msvideo',
+      flac: 'audio/flac',
+      m4a: 'audio/mp4',
+      m4v: 'video/mp4',
+      mkv: 'video/x-matroska',
+      mov: 'video/quicktime',
+      mp3: 'audio/mpeg',
+      mp4: 'video/mp4',
+      ogg: 'audio/ogg',
+      wav: 'audio/wav',
+      webm: 'video/webm'
+    }
+
+    return mimeTypes[extension] || 'application/octet-stream'
   }
 
   getTranscriptMetadataMediaPath(sourceData) {
@@ -695,12 +774,16 @@ class SubtitleEditor extends HTMLElement {
     this.loadedTranscriptFormat = document.format
     this.loadedTranscriptPath = document.path
     this.manualSpeakers = []
+    this.filledAudibleGapsSignature = ''
     this.cueSearchQuery = ''
     if (this.cueSearchInput) this.cueSearchInput.value = ''
     this.hasUnsavedChanges = false
     this.changeRevision = 0
     this.lastAutosavedAt = null
     this.renderSpeakerEditor()
+    if (this.shouldFillGapsWithCurrentAudio(document.sourceData)) {
+      this.fillAudibleCueGaps()
+    }
     this.renderCues()
     this.refreshPreviewTrack()
     this.loadMediaForTranscript(sourcePath, document.sourceData).catch(err => {
@@ -718,6 +801,16 @@ class SubtitleEditor extends HTMLElement {
       autosave: this.getAutosaveAvailability()
     })
     this.updateAutosaveStatus()
+  }
+
+  shouldFillGapsWithCurrentAudio(sourceData) {
+    if (!this.envelope || !this.frameDuration) return false
+    if (this.mediaLoadedManually) return true
+    if (!this.mediaLoadedFromPath) return false
+    if (this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return true
+
+    const metadataMediaPath = this.getTranscriptMetadataMediaPath(sourceData)
+    return metadataMediaPath === this.mediaLoadedFromPath
   }
 
   refreshPreviewTrack() {

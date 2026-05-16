@@ -1,0 +1,184 @@
+CONSTANTS
+
+DEFAULT_WINDOW_SIZE = 2048
+DEFAULT_MIN_GAP_DURATION = 0.1 seconds
+DEFAULT_ABSOLUTE_SOUND_THRESHOLD = 0.01
+DEFAULT_RELATIVE_SOUND_THRESHOLD = 0.08
+
+// what is an envelope?
+// A simplified representation of the audio's loudness over time, computed by dividing 
+// the audio into chunks and calculating the RMS loudness for each chunk. 
+// This allows us to quickly estimate where sound is present without analyzing every single sample.
+//
+// is it the same as smoothing?
+//
+// No, smoothing is a technique that can be applied to an envelope to reduce noise and create a more continuous representation of loudness.
+// Smoothing can help to better identify sustained sounds and ignore brief spikes in loudness.
+//
+// What does an audioBuffer actually contain?
+//
+// An audioBuffer is a data structure that contains the raw audio data, typically organized into channels (e.g., left and right for stereo) and samples.
+// Each sample is a numerical value representing the amplitude of the audio signal at a specific point in time.
+// The audioBuffer also includes metadata such as the sample rate, which indicates how many samples are played per second, and the number of channels.
+// The audioBuffer allows us to access the raw audio data for processing, such as building an envelope or analyzing sound levels.
+//
+// what does the function return?
+//
+// The buildEnvelope function returns an object containing two properties:
+// 1. envelope: An array of RMS loudness values, where each value corresponds to a specific time frame in the audio.
+// 2. frameDuration: The duration of each frame in seconds, which is calculated based on the window size and the sample rate of the audio.
+// This information can be used to determine the loudness of the audio at different points in time and to identify where sound is present or absent.
+// 
+// how does the system known which channel to use?
+//
+// The buildEnvelope function typically processes the first audio channel (e.g., the left channel in a stereo recording) by default.
+// This is a common approach because the first channel often contains the primary audio information. The function can be modified to process other channels if needed, but using the first channel is a standard practice for simplicity and consistency in audio analysis.
+//
+// How do we determine a sensible window size?
+//
+// The window size for building an envelope is typically determined based on the desired time resolution and the characteristics of the audio being analyzed.
+// A common window size is 2048 samples, which provides a good balance between time resolution and computational efficiency for many types of audio. However, the optimal window size can vary depending on factors such as the sample rate of the audio and the nature of the sound being analyzed (e.g., speech vs. music).
+// A smaller window size will provide a more detailed envelope but may be more computationally intensive, while a larger window size will provide a smoother envelope but may miss short bursts of sound. It's often a good idea to experiment with different window sizes to find the one that works best for your specific use case.
+FUNCTION buildEnvelope(audioBuffer, options)
+
+  Get the first audio channel from the audio buffer
+  Get the sample rate
+
+  Divide the audio into chunks ("windows")
+  For each window:
+
+    Start with:
+      sum = 0
+      count = 0
+
+    For each sample in the window:
+      square the sample value
+      add it to the sum
+      increment the count
+
+    Compute RMS loudness:
+      rms = square root of (sum / count)
+
+    Add rms value to the envelope list
+
+  Compute how long each frame lasts:
+    frameDuration = windowSize / sampleRate
+
+  Return:
+    envelope
+    frameDuration
+
+
+// how is the actual threshold determined?
+// 
+// The getSoundThreshold function determines the threshold for what counts as "audible sound" by 
+// considering both an absolute threshold and a relative threshold based on the peak loudness in the envelope.
+// In plain English, it works like this:
+// 1. It finds the loudest point in the envelope (the peak). 
+// (A typical value might be 0.5, which means the loudest point is at 50% of the maximum possible loudness.)
+// 2. It calculates a relative threshold by multiplying the peak loudness by a predefined relative threshold factor. 
+// (A common value for this factor might be 0.08, meaning that any sound louder than 8% of the peak is considered audible.)
+// 3. It compares the absolute threshold and the relative threshold, and chooses the larger of the two as the final threshold. 
+// (For example, if the absolute threshold is set at 0.01 and the relative threshold calculates to 0.04, the function will 
+// use 0.04 as the threshold for determining if sound is present. So in this case, any sound louder than 4% of the peak loudness would be considered audible, while anything below that would be ignored. A noisy recording will have a higher peak, which will raise the relative threshold and help to filter out background noise, while a quiet recording will have a lower peak, allowing softer sounds to be detected as audible.)
+// This approach ensures that the threshold is adaptive to the overall loudness of the audio.
+FUNCTION getSoundThreshold(envelope, options)
+
+  Find the loudest value in the envelope:
+    peak = maximum envelope value
+
+  Compute a relative threshold:
+    relativeValue = peak * relativeThreshold
+
+  Choose whichever is larger:
+    threshold = max(absoluteThreshold, relativeValue)
+
+  Return threshold
+
+
+// This function serves to determine whether there is audible sound in a specific time range by analyzing the envelope data.
+// In plain English, it works like this:
+// 1. It first checks if the envelope data is valid and if the start and end
+// times are valid (where valid means "they are within the bounds of the envelope array"). 
+// If any of these checks fail, it returns false, indicating that there is no sound in the range.
+// 2. It converts the start and end times into frame indexes, which correspond to the
+// positions in the envelope array that represent the loudness at those times.
+// 3. It then iterates through the frames between the first and last frame indexes,
+// checking the loudness value for each frame against the previously determined threshold.
+// 4. If it finds any frame where the loudness is greater than or equal to
+// the threshold, it returns true, indicating that there is sound in the range.
+// 5. If it finishes checking all the frames without finding any that meet the threshold,
+// it returns false, indicating that there is no sound in the range.
+FUNCTION hasSoundInRange(envelopeData, start, end, options)
+
+  If envelope data is invalid:
+    return false
+
+  If start/end times are invalid:
+    return false
+
+  Convert start/end times into frame indexes:
+    firstFrame = frame containing start time
+    lastFrame = frame containing end time
+
+  For each frame between firstFrame and lastFrame:
+
+    If frame loudness >= threshold:
+      return true
+
+  No loud frames were found:
+    return false
+
+
+
+FUNCTION getAudibleCueGaps(cues, envelopeData, options)
+
+  If there are fewer than 2 cues:
+    return empty list
+
+  If envelope data is invalid:
+    return empty list
+
+  // we need to do this because the cues might be out of order, and we want to check for gaps in the correct sequence.
+  // how could the get out of order?
+  // If the cues are generated by a speech-to-text engine, they might be created in
+  // the order that the engine processes the audio, which could be different from the actual chronological order of the cues in the recording.
+  Remove invalid cues
+  Sort cues by start time
+
+  Create empty gaps list
+
+  Set previousCue to the first cue
+
+  For each remaining cue:
+
+    nextCue = current cue
+
+    gapStart = previousCue.end
+    gapEnd = nextCue.start
+
+    gapDuration = gapEnd - gapStart
+
+    If:
+      gapDuration is long enough
+      AND there is sound in the gap
+
+      Then add a gap object:
+        start
+        end
+        previousCue
+        nextCue
+
+    If nextCue extends farther than previousCue:
+      previousCue = nextCue
+
+  Return all detected gaps
+
+
+
+OVERALL PURPOSE
+
+1. Build a simplified loudness timeline ("envelope") from audio
+2. Estimate what counts as "audible sound"
+3. Check whether a time range contains sound
+4. Find subtitle gaps where audio exists but no cue is displayed
