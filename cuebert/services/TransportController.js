@@ -64,15 +64,7 @@ class TransportController {
     this.setPlaybackRate(1)
 
     mediaPlayBtn?.addEventListener('click', () => {
-      if (!this.video.src) return
-      this.onPlaybackSync('transport-play')
-      if (this.video.paused) {
-        this.video.play().catch(err => {
-          console.error('Media playback failed:', err)
-        })
-      } else {
-        this.video.pause()
-      }
+      this.togglePlayback()
     })
 
     mediaSeek?.addEventListener('input', () => {
@@ -102,6 +94,20 @@ class TransportController {
       this.setPlaybackRate(this.getNextPlaybackRate())
       this.updateUi()
     })
+  }
+
+  togglePlayback(source = 'transport-play') {
+    if (!this.video?.src) return
+
+    this.onPlaybackSync(source)
+    if (this.video.paused) {
+      this.video.play().catch(err => {
+        console.error('Media playback failed:', err)
+      })
+      return
+    }
+
+    this.video.pause()
   }
 
   updateUi() {

@@ -74,6 +74,7 @@ class SubtitleEditor extends HTMLElement {
     this.playbackCueElement = null
     this.previewCueListeners = []
     this.transportPlaybackHighlightActive = false
+    this.globalPlaybackKeydownHandler = null
   }
 
   connectedCallback() {
@@ -89,6 +90,7 @@ class SubtitleEditor extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this.unbindKeyboardEvents()
     this.cancelScheduledAutosave()
     this.cancelScheduledPreviewTrackRefresh()
     this.clearPreviewCueListeners()
@@ -222,6 +224,10 @@ class SubtitleEditor extends HTMLElement {
             </div>
             <dl class="shortcut-list">
               <div>
+                <dt><kbd>Cmd</kbd><kbd>Shift</kbd><kbd>Enter</kbd></dt>
+                <dd>Play or pause media from anywhere</dd>
+              </div>
+              <div>
                 <dt><kbd>Cmd</kbd><kbd>/</kbd></dt>
                 <dd>Focus cue search</dd>
               </div>
@@ -344,11 +350,27 @@ class SubtitleEditor extends HTMLElement {
     this.bindPreferenceEvents()
     this.bindCueSearchEvents()
     this.bindKeyboardEvents()
+    this.bindCueListEvents()
 
     this.transportController.updateUi()
   }
 
+  bindCueListEvents() {
+    this.cueList.addEventListener('cuelistrender', () => {
+      this.syncCueListRenderState()
+    })
+  }
+
   bindKeyboardEvents() {
+    this.globalPlaybackKeydownHandler = event => {
+      if (!this.isGlobalPlaybackShortcut(event)) return
+
+      event.preventDefault()
+      event.stopPropagation()
+      this.transportController.togglePlayback()
+    }
+    document.addEventListener('keydown', this.globalPlaybackKeydownHandler, true)
+
     this.addEventListener('keydown', event => {
       if (
         event.code !== 'Slash' ||
@@ -363,6 +385,23 @@ class SubtitleEditor extends HTMLElement {
       event.stopPropagation()
       this.focusCueSearch()
     })
+  }
+
+  unbindKeyboardEvents() {
+    if (!this.globalPlaybackKeydownHandler) return
+
+    document.removeEventListener('keydown', this.globalPlaybackKeydownHandler, true)
+    this.globalPlaybackKeydownHandler = null
+  }
+
+  isGlobalPlaybackShortcut(event) {
+    return (
+      event.key === 'Enter' &&
+      event.metaKey &&
+      event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey
+    )
   }
 
   focusCueSearch() {
@@ -1174,7 +1213,9 @@ class SubtitleEditor extends HTMLElement {
   }
 
   focusCueText(cue, options = {}) {
-    const cueEditor = this.cueElementByCue.get(cue)
+    const cueEditor = this.cueList.ensureCueRendered?.(cue, options) ??
+      this.cueList.cueElementByCue?.get(cue) ??
+      this.cueElementByCue.get(cue)
     if (!cueEditor) return false
 
     this.setActiveCue(cue, cueEditor, options)
@@ -1210,7 +1251,9 @@ class SubtitleEditor extends HTMLElement {
     }
     if (!cue) return
 
-    const element = this.cueElementByCue.get(cue)
+    const element = this.cueList.ensureCueRendered?.(cue, options) ??
+      this.cueList.cueElementByCue?.get(cue) ??
+      this.cueElementByCue.get(cue)
     if (!element) return
 
     this.playbackCueElement = element
@@ -1611,11 +1654,15 @@ class SubtitleEditor extends HTMLElement {
       }
     }
 
+    this.syncCueListRenderState()
+
+    this.bindPreviewCueEvents()
+  }
+
+  syncCueListRenderState() {
     this.cueElementByCue = this.cueList.cueElementByCue
     this.activeCueElement = this.cueList.activeCueElement
     this.playbackCueElement = this.cueList.playbackCueElement
-
-    this.bindPreviewCueEvents()
   }
 }
 

@@ -192,7 +192,13 @@ class CueEditor extends HTMLElement {
   }
 
   handleTextKeydown(event) {
-    if (event.key === 'Enter' && event.metaKey && !event.altKey && !event.ctrlKey) {
+    if (
+      event.key === 'Enter' &&
+      event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey
+    ) {
       event.preventDefault()
       if (this.onPlayCue) this.onPlayCue(this.#data)
       return

@@ -1,0 +1,203 @@
+Import the CueEditor component.
+
+Define a CueListView custom element.
+
+When a CueListView is created:
+  Store its current data.
+  Create a map from cue objects to their rendered cue editor elements.
+  // what is the difference btween active and playback cues?
+  //
+  // active cue: the cue that is currently being edited or focused in the UI. This is the cue that the user is actively working with.
+  Track the active cue editor.
+  // playback cue: the cue that corresponds to the current playback position of the video. This is the cue that is currently "active" in terms of the video's timeline, regardless of whether the user is editing it or not.
+  Track the playback cue editor.
+  Track the currently rendered virtual range.
+  Set up virtual scrolling configuration:
+    estimated cue height
+    cue count threshold for virtualization
+    overscan amount
+  // what is a viewport change as described here?
+  //
+  // A viewport change refers to any change in the visible area of the cue list, which can occur due to user interactions such as scrolling or resizing the window. When the user scrolls through the cue list or resizes the window, the portion of the cue list that is visible on the screen changes. The viewport-change handler is responsible for responding to these changes by determining whether a new range of cues needs to be rendered based on the new viewport dimensions and scroll position.
+  Define a viewport-change handler:
+    If a render is already scheduled, do nothing.
+    Otherwise, schedule a virtual range render on the next animation frame.
+
+When asked to fetch data from a URL:
+  Fetch the URL.
+  Parse the response as JSON.
+  Store the result as this component’s data.
+
+When the element is connected to the page:
+  Listen for window scroll events.
+  Listen for window resize events.
+  Render the cue list.
+
+When the element is disconnected:
+  Stop listening for scroll and resize events.
+  Cancel any pending virtual-scroll render.
+
+Observe the `src` attribute.
+
+When the `src` attribute changes:
+  If the value actually changed:
+    Fetch cue-list data from the new URL.
+
+When data is set:
+  Store the new data, or an empty object if no data was provided.
+  Render the cue list.
+
+When rendering:
+  Read cues and display options from the current data.
+
+  If the cue list is large enough to virtualize:
+    Render only the visible virtual range.
+    Stop.
+
+  Otherwise:
+    Clear the element.
+    Reset cue-to-element tracking.
+    Reset active and playback cue tracking.
+
+    For each cue:
+      Append that cue’s editor block.
+
+    If there is an active cue but it was not tracked yet:
+      Look it up in the cue-to-element map.
+
+    Dispatch a “cue list rendered” event.
+
+To decide whether to virtualize:
+  Return true when the cue count is greater than the virtualization threshold.
+
+When rendering a virtual range:
+  Get the cue list and active cue.
+
+  If the list should not be virtualized:
+    Stop.
+
+  Determine the requested range, or calculate the range from scroll position.
+
+  If the range has not changed and rendering is not forced:
+    Stop.
+
+  Store the new rendered range.
+  Clear the element.
+  Reset cue-to-element tracking.
+  Reset active and playback cue tracking.
+
+  Create a top spacer whose height represents cues before the rendered range.
+  Create a bottom spacer whose height represents cues after the rendered range.
+
+  Append the top spacer.
+  For each cue index in the visible range:
+    Append that cue’s editor block.
+  Append the bottom spacer.
+
+  If there is an active cue but it was not tracked yet:
+    Look it up in the cue-to-element map.
+
+  Dispatch a “cue list rendered” event.
+
+To calculate the virtual range:
+  Measure the cue list’s position in the viewport.
+  Get the viewport height.
+  Estimate how far the user has scrolled through the cue list.
+  Convert that scroll offset into a first visible cue index.
+  Convert the viewport bottom into a last visible cue index.
+  Return a range expanded by the overscan amount.
+
+To create a virtual spacer:
+  Create a div.
+  Give it the virtual spacer class.
+  Set its block size to the requested height.
+  Return it.
+
+To dispatch the render event:
+  Dispatch a bubbling `cuelistrender` event.
+
+To append one cue block:
+  Read display options and handlers from the current data.
+  Get the cue for the requested index.
+
+  If there is no cue:
+    Stop.
+
+  If merging is allowed and this is not the first cue:
+    Add a merge row between the previous cue and this cue.
+
+  Create a `cue-editor` element.
+  Pass it:
+    the video element
+    the time formatter
+    speaker options
+    waveform envelope data
+    waveform frame duration
+    context window size
+    the cue data itself
+
+  Store the cue-editor in the cue-to-element map.
+
+  If this cue is the active cue:
+    Track this cue-editor as the active element.
+
+  If this cue is the playback cue:
+    Add the playback-active class.
+    Track this cue-editor as the playback element.
+
+  Wire the cue-editor callbacks to the parent handlers:
+    play cue
+    set speaker
+    split cue
+    delete cue
+    navigate cue
+    waveform seek
+    waveform boundary change
+    waveform boundary commit
+
+  When the cue-editor receives focus or is clicked:
+    Notify the parent that this cue is focused.
+
+  When the cue-editor reports a cue change:
+    Notify the parent that this cue changed.
+
+  Append the cue-editor to the cue list.
+
+To ensure a particular cue is rendered:
+  Find the cue’s index in the full cue list.
+
+  If the cue is not in the list:
+    Return nothing.
+
+  If virtualization is active:
+    Check whether the cue is inside the currently rendered range.
+
+    If it is not rendered:
+      Force-render a range centered around that cue.
+
+  Look up the cue’s editor element.
+
+  If scrolling was requested and the editor exists:
+    Scroll it into the center of the viewport.
+
+  Return the cue editor element.
+
+To create a merge row:
+  Create a row element.
+  Give it the merge-row class.
+
+  Create a button.
+  Configure it as a normal button.
+  Give it the merge-button class.
+  Set its label to “▲ merge ▼”.
+  Set its title to explain that it merges the cue above and below.
+
+  When the button is clicked:
+    Call the merge-cues handler with the previous cue and next cue.
+
+  Put the button inside the row.
+  Return the row.
+
+Register the custom element as `<cue-list-view>`.
+
+Export the CueListView class.
