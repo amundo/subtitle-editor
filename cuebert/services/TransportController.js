@@ -57,8 +57,11 @@ class TransportController {
       mediaPlayBtn,
       mediaSeek,
       mediaMuteBtn,
-      mediaVolume
+      mediaVolume,
+      playbackSpeedBtn
     } = this.controls
+
+    this.setPlaybackRate(1)
 
     mediaPlayBtn?.addEventListener('click', () => {
       if (!this.video.src) return
@@ -94,6 +97,11 @@ class TransportController {
       this.video.muted = this.video.volume === 0
       this.updateUi()
     })
+
+    playbackSpeedBtn?.addEventListener('click', () => {
+      this.setPlaybackRate(this.getNextPlaybackRate())
+      this.updateUi()
+    })
   }
 
   updateUi() {
@@ -105,7 +113,9 @@ class TransportController {
       mediaSeek,
       mediaPlayBtn,
       mediaMuteBtn,
-      mediaVolume
+      mediaVolume,
+      playbackSpeedBtn,
+      playbackSpeedValue
     } = this.controls
     const duration = this.getMediaDuration()
     const currentTime = Number.isFinite(this.video.currentTime) ? this.video.currentTime : 0
@@ -140,6 +150,19 @@ class TransportController {
     if (mediaVolume) {
       mediaVolume.value = String(this.video.muted ? 0 : this.video.volume)
     }
+
+    if (playbackSpeedValue) {
+      playbackSpeedValue.textContent = `${TransportController.formatPlaybackRate(
+        this.video.playbackRate || 1
+      )}x`
+    }
+
+    if (playbackSpeedBtn) {
+      playbackSpeedBtn.setAttribute(
+        'aria-label',
+        `Playback speed: ${TransportController.formatPlaybackRate(this.video.playbackRate || 1)}x`
+      )
+    }
   }
 
   playTimeRange(start, end) {
@@ -167,6 +190,27 @@ class TransportController {
 
   getMediaDuration() {
     return Number.isFinite(this.video?.duration) ? this.video.duration : 0
+  }
+
+  setPlaybackRate(rate) {
+    if (!this.video || !Number.isFinite(rate)) return
+
+    this.video.playbackRate = Math.min(2, Math.max(0.25, rate))
+  }
+
+  getNextPlaybackRate() {
+    const speeds = [1, 1.25, 1.5, 1.75, 2, 0.5, 0.25]
+    const currentIndex = speeds.findIndex(speed => (
+      Math.abs(speed - this.video.playbackRate) < 0.001
+    ))
+
+    if (currentIndex === -1) return 1
+
+    return speeds[(currentIndex + 1) % speeds.length]
+  }
+
+  static formatPlaybackRate(rate) {
+    return Number(rate.toFixed(2)).toString()
   }
 
   static renderVolumeIcon(muted) {

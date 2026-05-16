@@ -194,6 +194,15 @@ class SubtitleEditor extends HTMLElement {
               value="1"
               aria-label="Volume"
             >
+            <button
+              data-role="playbackSpeedBtn"
+              class="transport-button playback-speed-button"
+              type="button"
+              aria-label="Playback speed: 1x"
+              title="Playback speed"
+            >
+              <span data-role="playbackSpeedValue">1x</span>
+            </button>
           </div>
         </footer>
 
@@ -267,6 +276,8 @@ class SubtitleEditor extends HTMLElement {
     this.mediaSeek = this.querySelector('[data-role="mediaSeek"]')
     this.mediaMuteBtn = this.querySelector('[data-role="mediaMuteBtn"]')
     this.mediaVolume = this.querySelector('[data-role="mediaVolume"]')
+    this.playbackSpeedBtn = this.querySelector('[data-role="playbackSpeedBtn"]')
+    this.playbackSpeedValue = this.querySelector('[data-role="playbackSpeedValue"]')
     this.mediaLoadControl = this.querySelector('[data-role="mediaLoadControl"]')
     this.videoFileInput = this.querySelector('[data-role="videoFile"]')
     this.vttFileInput = this.querySelector('[data-role="vttFile"]')
@@ -308,7 +319,9 @@ class SubtitleEditor extends HTMLElement {
         mediaSeek: this.mediaSeek,
         mediaPlayBtn: this.mediaPlayBtn,
         mediaMuteBtn: this.mediaMuteBtn,
-        mediaVolume: this.mediaVolume
+        mediaVolume: this.mediaVolume,
+        playbackSpeedBtn: this.playbackSpeedBtn,
+        playbackSpeedValue: this.playbackSpeedValue
       },
       getPreviewEnd: () => this.previewEnd,
       setPreviewEnd: previewEnd => {
