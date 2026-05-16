@@ -17,15 +17,20 @@ class TransportController {
     this.setPreviewEnd = setPreviewEnd
     this.onPlaybackSync = onPlaybackSync
     this.onPreviewTrackLoad = onPreviewTrackLoad
+    this.playRequestId = 0
+    this.playbackRequested = false
+    this.previewRange = null
   }
 
   bindVideoEvents() {
     this.video.addEventListener('timeupdate', () => {
       this.updateUi()
       this.onPlaybackSync('timeupdate')
-      if (this.getPreviewEnd() !== null && this.video.currentTime >= this.getPreviewEnd()) {
-        this.video.pause()
-        this.setPreviewEnd(null)
+      if (
+        this.getPreviewEnd() !== null &&
+        this.video.currentTime >= this.getPreviewEnd()
+      ) {
+        this.pausePlayback()
       }
     })
 
@@ -38,11 +43,16 @@ class TransportController {
     })
 
     this.video.addEventListener('play', () => {
+      if (!this.playbackRequested) {
+        this.video.pause()
+        return
+      }
       this.updateUi()
       this.onPlaybackSync('play')
     })
 
     this.video.addEventListener('pause', () => {
+      this.playbackRequested = false
       this.updateUi()
     })
 
@@ -70,6 +80,19 @@ class TransportController {
     mediaSeek?.addEventListener('input', () => {
       const nextTime = Number(mediaSeek.value)
       if (Number.isFinite(nextTime)) {
+        this.setPreviewEnd(null)
+        this.previewRange = null
+        this.video.currentTime = nextTime
+        this.updateUi()
+        this.onPlaybackSync('transport-seek-preview')
+      }
+    })
+
+    mediaSeek?.addEventListener('change', () => {
+      const nextTime = Number(mediaSeek.value)
+      if (Number.isFinite(nextTime)) {
+        this.setPreviewEnd(null)
+        this.previewRange = null
         this.video.currentTime = nextTime
         this.updateUi()
         this.onPlaybackSync('transport-seek')
@@ -97,17 +120,41 @@ class TransportController {
   }
 
   togglePlayback(source = 'transport-play') {
-    if (!this.video?.src) return
+    if (!this.hasMediaSource()) return
 
     this.onPlaybackSync(source)
-    if (this.video.paused) {
-      this.video.play().catch(err => {
-        console.error('Media playback failed:', err)
-      })
+    if (this.isPlaybackActive()) {
+      this.pausePlayback()
       return
     }
 
+    this.playMedia()
+  }
+
+  pausePlayback() {
+    if (!this.video) return
+
+    this.playRequestId++
+    this.playbackRequested = false
+    this.setPreviewEnd(null)
+    this.previewRange = null
     this.video.pause()
+    this.updateUi()
+  }
+
+  playMedia() {
+    if (!this.video) return
+
+    const playRequestId = ++this.playRequestId
+    this.playbackRequested = true
+    this.updateUi()
+    this.video.play().catch(err => {
+      if (playRequestId !== this.playRequestId) return
+      this.playbackRequested = false
+      this.previewRange = null
+      this.updateUi()
+      console.error('Media playback failed:', err)
+    })
   }
 
   updateUi() {
@@ -141,9 +188,10 @@ class TransportController {
     }
 
     if (mediaPlayBtn) {
-      mediaPlayBtn.textContent = this.video.paused ? '▶' : '❚❚'
-      mediaPlayBtn.disabled = !this.video.src
-      mediaPlayBtn.setAttribute('aria-label', this.video.paused ? 'Play' : 'Pause')
+      const playbackActive = this.isPlaybackActive()
+      mediaPlayBtn.textContent = playbackActive ? '❚❚' : '▶'
+      mediaPlayBtn.disabled = !this.hasMediaSource()
+      mediaPlayBtn.setAttribute('aria-label', playbackActive ? 'Pause' : 'Play')
     }
 
     if (mediaMuteBtn) {
@@ -172,15 +220,36 @@ class TransportController {
   }
 
   playTimeRange(start, end) {
-    if (!this.video || !this.video.src) return
+    if (!this.video || !this.hasMediaSource()) return
 
+    const rangeStart = Math.min(start, end)
+    const rangeEnd = Math.max(start, end)
     this.onPlaybackSync('cue-preview')
-    this.setPreviewEnd(Math.max(start, end))
-    this.video.currentTime = Math.max(0, start)
+    this.setPreviewEnd(rangeEnd)
+    this.previewRange = { start: rangeStart, end: rangeEnd }
+    this.video.currentTime = Math.max(0, rangeStart)
     this.updateUi()
-    this.video.play().catch(err => {
-      console.error('Media playback failed:', err)
-    })
+    this.playMedia()
+  }
+
+  toggleTimeRange(start, end) {
+    if (!this.video || !this.hasMediaSource()) return
+
+    const rangeStart = Math.min(start, end)
+    const rangeEnd = Math.max(start, end)
+    const isPlayingThisRange = (
+      this.isPlaybackActive() &&
+      this.previewRange !== null &&
+      Math.abs(this.previewRange.start - rangeStart) < 0.001 &&
+      Math.abs(this.previewRange.end - rangeEnd) < 0.001
+    )
+
+    if (isPlayingThisRange) {
+      this.pausePlayback()
+      return
+    }
+
+    this.playTimeRange(start, end)
   }
 
   playBoundaryPreview(cue, edge) {
@@ -196,6 +265,14 @@ class TransportController {
 
   getMediaDuration() {
     return Number.isFinite(this.video?.duration) ? this.video.duration : 0
+  }
+
+  hasMediaSource() {
+    return Boolean(this.video?.src || this.video?.currentSrc)
+  }
+
+  isPlaybackActive() {
+    return Boolean(this.playbackRequested || (this.video && !this.video.paused))
   }
 
   setPlaybackRate(rate) {

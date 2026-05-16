@@ -65,6 +65,7 @@ class SubtitleEditor extends HTMLElement {
     this.envelope = null
     this.frameDuration = null
     this.filledAudibleGapsSignature = ''
+    this.lastWaveformPlayheadTime = null
 
     // cue focus/playback UI state
     this.activeCue = null
@@ -75,6 +76,7 @@ class SubtitleEditor extends HTMLElement {
     this.previewCueListeners = []
     this.transportPlaybackHighlightActive = false
     this.globalPlaybackKeydownHandler = null
+    this.keyboardFocusedCue = null
   }
 
   connectedCallback() {
@@ -154,6 +156,9 @@ class SubtitleEditor extends HTMLElement {
               <span>Whole Words</span>
             </label>
             <span data-role="cueSearchCount" class="cue-search-count"></span>
+            <button data-role="clearCueSearchBtn" class="cue-search-clear" type="button" hidden>
+              Show in context
+            </button>
           </div>
           <cue-list-view data-role="cueList" class="cue-list"></cue-list-view>
         </div>
@@ -236,6 +241,10 @@ class SubtitleEditor extends HTMLElement {
                 <dd>Play current cue while editing text</dd>
               </div>
               <div>
+                <dt><kbd>Cmd</kbd><kbd>Delete</kbd></dt>
+                <dd>Delete current cue with confirmation</dd>
+              </div>
+              <div>
                 <dt><kbd>Cmd</kbd><kbd>Option</kbd><kbd>Down</kbd></dt>
                 <dd>Move to next visible cue text box</dd>
               </div>
@@ -293,6 +302,7 @@ class SubtitleEditor extends HTMLElement {
     this.cueSearchMatchCaseInput = this.querySelector('[data-role="cueSearchMatchCase"]')
     this.cueSearchWholeWordsInput = this.querySelector('[data-role="cueSearchWholeWords"]')
     this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
+    this.clearCueSearchBtn = this.querySelector('[data-role="clearCueSearchBtn"]')
     this.saveBtn = this.querySelector('[data-role="saveBtn"]')
     this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
     this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
@@ -363,11 +373,23 @@ class SubtitleEditor extends HTMLElement {
 
   bindKeyboardEvents() {
     this.globalPlaybackKeydownHandler = event => {
-      if (!this.isGlobalPlaybackShortcut(event)) return
+      if (this.isGlobalPlaybackShortcut(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        this.transportController.togglePlayback()
+        return
+      }
 
-      event.preventDefault()
-      event.stopPropagation()
-      this.transportController.togglePlayback()
+      if (this.isCueNavigationShortcut(event)) {
+        if (event.target?.closest?.('cue-editor')) return
+
+        const cue = this.getKeyboardNavigationCue(event)
+        if (!cue) return
+
+        event.preventDefault()
+        event.stopPropagation()
+        this.navigateCueText(cue, event.key === 'ArrowDown' ? 1 : -1)
+      }
     }
     document.addEventListener('keydown', this.globalPlaybackKeydownHandler, true)
 
@@ -404,12 +426,48 @@ class SubtitleEditor extends HTMLElement {
     )
   }
 
+  isCueNavigationShortcut(event) {
+    return (
+      (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
+      event.metaKey &&
+      event.altKey &&
+      !event.ctrlKey
+    )
+  }
+
+  getKeyboardNavigationCue(event) {
+    const cueEditor = event.target?.closest?.('cue-editor')
+    return cueEditor?.data ?? this.activeCue
+  }
+
   focusCueSearch() {
     if (!this.cueSearchInput) return
 
+    this.keyboardFocusedCue = null
     this.cueSearchRow?.scrollIntoView({ block: 'start', behavior: 'smooth' })
     this.cueSearchInput.focus({ preventScroll: true })
     this.cueSearchInput.select()
+  }
+
+  clearCueSearch({ keepCueInContext = false } = {}) {
+    const contextCue = this.activeCue ?? this.playbackCue
+
+    this.cueSearchQuery = ''
+    if (this.cueSearchInput) this.cueSearchInput.value = ''
+    this.renderCues()
+
+    if (keepCueInContext && contextCue) {
+      this.setActiveCueInContext(contextCue)
+    }
+  }
+
+  setActiveCueInContext(cue) {
+    const cueEditor = this.cueList.ensureCueRendered?.(cue, { scroll: true }) ??
+      this.cueList.cueElementByCue?.get(cue) ??
+      this.cueElementByCue.get(cue)
+    if (!cueEditor) return
+
+    this.setActiveCue(cue, cueEditor, { scroll: true, scrollBehavior: 'auto' })
   }
 
   bindFileEvents() {
@@ -548,6 +606,9 @@ class SubtitleEditor extends HTMLElement {
     this.cueSearchWholeWordsInput?.addEventListener('change', () => {
       this.cueSearchWholeWords = this.cueSearchWholeWordsInput.checked
       this.renderCues()
+    })
+    this.clearCueSearchBtn?.addEventListener('click', () => {
+      this.clearCueSearch({ keepCueInContext: true })
     })
   }
 
@@ -888,7 +949,7 @@ class SubtitleEditor extends HTMLElement {
 
     this.previewTrackRefreshTimer = window.setTimeout(() => {
       this.refreshPreviewTrack()
-    }, 0)
+    }, 250)
   }
 
   cancelScheduledPreviewTrackRefresh() {
@@ -1208,17 +1269,21 @@ class SubtitleEditor extends HTMLElement {
     this.activeCue = cue
     this.activeCueElement = element
     if (options.scroll && element) {
-      element.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      element.scrollIntoView({
+        block: 'center',
+        behavior: options.scrollBehavior ?? 'smooth'
+      })
     }
   }
 
   focusCueText(cue, options = {}) {
-    const cueEditor = this.cueList.ensureCueRendered?.(cue, options) ??
+    const cueEditor = this.cueList.ensureCueRendered?.(cue) ??
       this.cueList.cueElementByCue?.get(cue) ??
       this.cueElementByCue.get(cue)
     if (!cueEditor) return false
 
     this.setActiveCue(cue, cueEditor, options)
+    this.keyboardFocusedCue = cue
     cueEditor.focusText?.()
     return true
   }
@@ -1231,11 +1296,14 @@ class SubtitleEditor extends HTMLElement {
     const nextCue = visibleCues[currentIndex + direction]
     if (!nextCue) return
 
-    this.focusCueText(nextCue, { scroll: true })
+    this.focusCueText(nextCue, { scroll: true, scrollBehavior: 'auto' })
   }
 
   setPlaybackCue(cue, source = 'playback', options = {}) {
-    if (this.playbackCue === cue) return
+    if (this.playbackCue === cue) {
+      this.ensurePlaybackCueElement(cue, options)
+      return
+    }
 
     const previousCue = this.playbackCue
     if (this.playbackCueElement) {
@@ -1251,7 +1319,7 @@ class SubtitleEditor extends HTMLElement {
     }
     if (!cue) return
 
-    const element = this.cueList.ensureCueRendered?.(cue, options) ??
+    const element = this.cueList.ensureCueRendered?.(cue) ??
       this.cueList.cueElementByCue?.get(cue) ??
       this.cueElementByCue.get(cue)
     if (!element) return
@@ -1262,6 +1330,30 @@ class SubtitleEditor extends HTMLElement {
       detail: { cue, source },
       bubbles: true
     }))
+    this.setActiveCue(cue, element, { scroll: options.scroll })
+  }
+
+  ensurePlaybackCueElement(cue, options = {}) {
+    if (!cue) return
+
+    const currentElementStillRendered = (
+      this.playbackCueElement &&
+      this.playbackCueElement.isConnected &&
+      this.playbackCueElement.data === cue
+    )
+
+    if (currentElementStillRendered) {
+      this.playbackCueElement.classList.add('is-playback-active')
+      return
+    }
+
+    const element = this.cueList.ensureCueRendered?.(cue) ??
+      this.cueList.cueElementByCue?.get(cue) ??
+      this.cueElementByCue.get(cue)
+    if (!element) return
+
+    this.playbackCueElement = element
+    element.classList.add('is-playback-active')
     this.setActiveCue(cue, element, { scroll: options.scroll })
   }
 
@@ -1286,19 +1378,52 @@ class SubtitleEditor extends HTMLElement {
   syncActiveCueToPlayback(source = 'playback') {
     this.updateTransportPlaybackHighlightState(source)
     if (!this.video || this.previewEnd !== null) return
+    this.updateRenderedWaveformPlayheads()
     if (this.video.paused && source !== 'transport-seek') return
     if (!this.transportPlaybackHighlightActive) return
 
     const currentCue = this.findCueAtTime(this.video.currentTime)
     if (currentCue) {
-      this.setPlaybackCue(currentCue, source, { scroll: true })
+      if (
+        source === 'transport-seek-preview' &&
+        !this.cueList.cueElementByCue?.has(currentCue)
+      ) {
+        this.setPlaybackCueReference(currentCue, source)
+        return
+      }
+
+      this.setPlaybackCue(currentCue, source, {
+        scroll: source !== 'transport-seek-preview'
+      })
     } else {
       this.clearPlaybackCue(null, source)
     }
   }
 
+  setPlaybackCueReference(cue, source = 'playback') {
+    if (this.playbackCue === cue) return
+
+    const previousCue = this.playbackCue
+    if (this.playbackCueElement) {
+      this.playbackCueElement.classList.remove('is-playback-active')
+    }
+    this.playbackCue = cue
+    this.playbackCueElement = null
+
+    if (previousCue) {
+      this.dispatchEvent(new CustomEvent('cueend', {
+        detail: { cue: previousCue, source },
+        bubbles: true
+      }))
+    }
+  }
+
   updateTransportPlaybackHighlightState(source) {
-    if (source === 'transport-play' || source === 'transport-seek') {
+    if (
+      source === 'transport-play' ||
+      source === 'transport-seek' ||
+      source === 'transport-seek-preview'
+    ) {
       this.transportPlaybackHighlightActive = true
       return
     }
@@ -1318,6 +1443,22 @@ class SubtitleEditor extends HTMLElement {
       time >= cue.start &&
       time < cue.end
     ) ?? null
+  }
+
+  updateRenderedWaveformPlayheads(time = this.video?.currentTime) {
+    const playheadTime = Number.isFinite(time) ? time : null
+    if (
+      playheadTime !== null &&
+      this.lastWaveformPlayheadTime !== null &&
+      Math.abs(playheadTime - this.lastWaveformPlayheadTime) < 0.025
+    ) {
+      return
+    }
+
+    this.lastWaveformPlayheadTime = playheadTime
+    this.cueList?.cueElementByCue?.forEach(cueEditor => {
+      cueEditor.updatePlayhead?.(playheadTime)
+    })
   }
 
   bindPreviewCueEvents() {
@@ -1491,7 +1632,11 @@ class SubtitleEditor extends HTMLElement {
   }
 
   splitCue(cue, selection = {}) {
+    const cueIndex = this.cues.indexOf(cue)
     splitCueOperation.call(this, cue, selection)
+    if (cueIndex !== -1 && this.cues.includes(cue)) {
+      this.focusCueText(cue, { scroll: false })
+    }
   }
 
   mergeCues(targetCue, mergedCue) {
@@ -1499,7 +1644,12 @@ class SubtitleEditor extends HTMLElement {
   }
 
   deleteCue(cue) {
+    const shouldRestoreFocus = this.activeCue === cue || this.keyboardFocusedCue === cue
     deleteCueOperation.call(this, cue)
+    this.keyboardFocusedCue = this.activeCue
+    if (shouldRestoreFocus && this.activeCue) {
+      this.focusCueText(this.activeCue, { scroll: false })
+    }
   }
 
   addSpeaker(speaker) {
@@ -1582,11 +1732,13 @@ class SubtitleEditor extends HTMLElement {
       this.cueSearchCount.textContent = this.cues.length
         ? `${this.cues.length} cues`
         : ''
+      if (this.clearCueSearchBtn) this.clearCueSearchBtn.hidden = true
       return
     }
 
     const matchLabel = matchedCues.length === 1 ? 'match' : 'matches'
     this.cueSearchCount.textContent = `${visibleCues.length} of ${this.cues.length} ${matchLabel}`
+    if (this.clearCueSearchBtn) this.clearCueSearchBtn.hidden = false
   }
 
   renderCues() {
@@ -1604,10 +1756,11 @@ class SubtitleEditor extends HTMLElement {
       speakers: this.getUniqueSpeakers(),
       envelope: this.envelope,
       frameDuration: this.frameDuration,
+      playheadTime: this.video?.currentTime,
       formatTime,
       handlers: {
         onPlayCue: cue => {
-          this.transportController.playTimeRange(cue.start, cue.end)
+          this.transportController.toggleTimeRange(cue.start, cue.end)
         },
         onSetSpeaker: (cue, nextSpeaker, cueEditor) => {
           this.setCueSpeaker(cue, nextSpeaker, cueEditor)
@@ -1629,6 +1782,8 @@ class SubtitleEditor extends HTMLElement {
             this.transportController.getMediaDuration()
           )
           this.transportController.updateUi()
+          this.updateRenderedWaveformPlayheads(this.video.currentTime)
+          this.syncActiveCueToPlayback('transport-seek')
         },
         onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
           cueEditor.updateBoundaryPreviewLabels(
@@ -1655,14 +1810,36 @@ class SubtitleEditor extends HTMLElement {
     }
 
     this.syncCueListRenderState()
-
-    this.bindPreviewCueEvents()
   }
 
   syncCueListRenderState() {
     this.cueElementByCue = this.cueList.cueElementByCue
     this.activeCueElement = this.cueList.activeCueElement
     this.playbackCueElement = this.cueList.playbackCueElement
+    this.restoreKeyboardCueFocus()
+  }
+
+  restoreKeyboardCueFocus() {
+    if (!this.keyboardFocusedCue) return
+
+    const focusedCueEditor = document.activeElement?.closest?.('cue-editor')
+    if (focusedCueEditor?.data === this.keyboardFocusedCue) return
+    if (
+      document.activeElement &&
+      document.activeElement !== document.body &&
+      !focusedCueEditor &&
+      !document.activeElement.closest?.('cue-list-view')
+    ) {
+      return
+    }
+
+    const cueEditor = this.cueList.ensureCueRendered?.(this.keyboardFocusedCue) ??
+      this.cueList.cueElementByCue?.get(this.keyboardFocusedCue) ??
+      this.cueElementByCue.get(this.keyboardFocusedCue)
+    if (!cueEditor) return
+
+    this.activeCueElement = cueEditor
+    cueEditor.focusText?.()
   }
 }
 

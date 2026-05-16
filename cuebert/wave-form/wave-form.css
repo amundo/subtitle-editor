@@ -35,6 +35,16 @@ wave-form .wf-boundary {
   vector-effect: non-scaling-stroke;
 }
 
+wave-form .wf-playhead {
+  stroke: #cf222e;
+  stroke-width: 1.35;
+  vector-effect: non-scaling-stroke;
+}
+
+wave-form .wf-playhead[hidden] {
+  display: none;
+}
+
 wave-form .wf-handle {
   fill: transparent;
   cursor: ew-resize;

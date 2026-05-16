@@ -57,12 +57,13 @@ class CueListView extends HTMLElement {
       speakers = [],
       envelope = null,
       frameDuration = null,
+      playheadTime = null,
       formatTime = seconds => seconds.toFixed(3),
       handlers = {}
     } = this.#data
 
     if (this.shouldVirtualize(cues)) {
-      this.renderVirtualRange()
+      this.renderVirtualRange({ force: true })
       return
     }
 
@@ -154,6 +155,7 @@ class CueListView extends HTMLElement {
       speakers = [],
       envelope = null,
       frameDuration = null,
+      playheadTime = null,
       formatTime = seconds => seconds.toFixed(3),
       handlers = {}
     } = this.#data
@@ -170,6 +172,7 @@ class CueListView extends HTMLElement {
     cueEditor.speakerOptions = speakers
     cueEditor.envelope = envelope
     cueEditor.frameDuration = frameDuration
+    cueEditor.playheadTime = playheadTime
     cueEditor.contextWindow = 0.75
     cueEditor.data = cue
 

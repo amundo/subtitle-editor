@@ -470,6 +470,23 @@ cue-bert {
     white-space: nowrap;
   }
 
+  .cue-search-clear {
+    border: 1px solid #378f8f;
+    border-radius: 999px;
+    background: #ecfdfd;
+    color: #155e63;
+    padding: 0.35rem 0.7rem;
+    cursor: pointer;
+    font: inherit;
+    font-size: 0.85rem;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .cue-search-clear:hover {
+    background: #d7f7f7;
+  }
+
   .cue-list {
     display: block;
     border: 1px solid #d8dee4;

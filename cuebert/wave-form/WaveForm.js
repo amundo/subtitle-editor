@@ -8,9 +8,11 @@ class WaveForm extends HTMLElement {
     this.frameDuration = null
     this.start = null
     this.end = null
+    this.playheadTime = null
     this.contextWindow = 0.75
 
     this.svg = null
+    this.playheadElement = null
     this.visibleStart = 0
     this.visibleEnd = 0
     this.draggingEdge = null
@@ -23,11 +25,12 @@ class WaveForm extends HTMLElement {
     if (!this.svg) this.render()
   }
 
-  set data({ envelope, frameDuration, start, end, contextWindow } = {}) {
+  set data({ envelope, frameDuration, start, end, playheadTime, contextWindow } = {}) {
     this.envelope = envelope ?? this.envelope
     this.frameDuration = frameDuration ?? this.frameDuration
     this.start = start ?? this.start
     this.end = end ?? this.end
+    this.playheadTime = playheadTime ?? this.playheadTime
     this.contextWindow = contextWindow ?? this.contextWindow
 
     if (!this.svg) {
@@ -36,6 +39,11 @@ class WaveForm extends HTMLElement {
     }
 
     this.renderWaveform()
+  }
+
+  setPlayheadTime(time) {
+    this.playheadTime = Number.isFinite(time) ? time : null
+    this.updatePlayhead()
   }
 
   render() {
@@ -110,6 +118,7 @@ class WaveForm extends HTMLElement {
       this.end == null
     ) {
       this.svg.innerHTML = ''
+      this.playheadElement = null
       return
     }
 
@@ -193,9 +202,34 @@ class WaveForm extends HTMLElement {
       <path class="wf-next" d="${nextPath}"></path>
       <line class="wf-boundary" x1="${xCurrStart.toFixed(2)}" y1="0" x2="${xCurrStart.toFixed(2)}" y2="${height}"></line>
       <line class="wf-boundary" x1="${xCurrEnd.toFixed(2)}" y1="0" x2="${xCurrEnd.toFixed(2)}" y2="${height}"></line>
+      <line class="wf-playhead" y1="0" y2="${height}"></line>
       <rect class="wf-handle" data-edge="start" x="${Math.max(0, xCurrStart - 1.6).toFixed(2)}" y="0" width="3.2" height="${height}"></rect>
       <rect class="wf-handle" data-edge="end" x="${Math.min(width - 3.2, xCurrEnd - 1.6).toFixed(2)}" y="0" width="3.2" height="${height}"></rect>
     `
+    this.playheadElement = this.svg.querySelector('.wf-playhead')
+    this.updatePlayhead()
+  }
+
+  updatePlayhead() {
+    if (!this.playheadElement) return
+
+    const isVisible = (
+      Number.isFinite(this.playheadTime) &&
+      this.visibleEnd > this.visibleStart &&
+      this.playheadTime >= this.visibleStart &&
+      this.playheadTime <= this.visibleEnd
+    )
+
+    if (!isVisible) {
+      this.playheadElement.setAttribute('hidden', '')
+      return
+    }
+
+    const x = ((this.playheadTime - this.visibleStart) / (this.visibleEnd - this.visibleStart)) * 100
+    const formattedX = x.toFixed(2)
+    this.playheadElement.removeAttribute('hidden')
+    this.playheadElement.setAttribute('x1', formattedX)
+    this.playheadElement.setAttribute('x2', formattedX)
   }
 
   endBoundaryDrag(event) {

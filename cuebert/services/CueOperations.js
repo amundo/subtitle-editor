@@ -54,13 +54,14 @@ function deleteCue(cue) {
   const index = this.cues.indexOf(cue)
   if (index === -1) return
 
+  const nextActiveCue = this.cues[index + 1] ?? this.cues[index - 1] ?? null
   this.cues.splice(index, 1)
   if (this.activeCue === cue) {
-    this.activeCue = null
+    this.activeCue = nextActiveCue
     this.activeCueElement = null
   }
 
-  this.afterCueChange()
+  this.afterCueChange({ speakersChanged: false })
 }
 
 export { splitCue, mergeCues, deleteCue }

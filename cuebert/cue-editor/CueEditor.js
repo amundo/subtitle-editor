@@ -12,6 +12,7 @@ class CueEditor extends HTMLElement {
     // waveform props
     this.envelope = null
     this.frameDuration = null
+    this.playheadTime = null
     this.contextWindow = 0.75 // seconds
 
     // callbacks wired by SubtitleEditor
@@ -70,8 +71,8 @@ class CueEditor extends HTMLElement {
           <span class="cue-meta-spacer"></span>
 
           <button class="cue-action-button" data-role="splitCue" type="button"
-                  title="Split this cue at the text cursor; timing splits at the playhead or midpoint">
-            Split at cursor
+                  title="Split this cue at the current media time; text splits at the cursor">
+            Split at current timestamp
           </button>
           <button class="cue-action-button danger" data-role="deleteCue" type="button"
                   title="Delete this cue">
@@ -186,8 +187,7 @@ class CueEditor extends HTMLElement {
     })
 
     this.querySelector('[data-role="deleteCue"]')?.addEventListener('click', () => {
-      if (!window.confirm('Delete this cue? This cannot be undone.')) return
-      if (this.onDeleteCue) this.onDeleteCue()
+      this.confirmDeleteCue()
     })
   }
 
@@ -205,6 +205,19 @@ class CueEditor extends HTMLElement {
     }
 
     if (
+      (event.key === 'Backspace' || event.key === 'Delete') &&
+      event.metaKey &&
+      !event.shiftKey &&
+      !event.altKey &&
+      !event.ctrlKey
+    ) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.confirmDeleteCue()
+      return
+    }
+
+    if (
       (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
       event.metaKey &&
       event.altKey &&
@@ -214,6 +227,11 @@ class CueEditor extends HTMLElement {
       event.stopPropagation()
       this.onNavigateCue?.(event.key === 'ArrowDown' ? 1 : -1)
     }
+  }
+
+  confirmDeleteCue() {
+    if (!window.confirm('Delete this cue? This cannot be undone.')) return
+    if (this.onDeleteCue) this.onDeleteCue()
   }
 
   focusText() {
@@ -250,8 +268,14 @@ class CueEditor extends HTMLElement {
       frameDuration: this.frameDuration,
       start: this.#data.start,
       end: this.#data.end,
+      playheadTime: this.playheadTime,
       contextWindow: this.contextWindow
     }
+  }
+
+  updatePlayhead(time) {
+    this.playheadTime = Number.isFinite(time) ? time : null
+    this.waveForm?.setPlayheadTime?.(this.playheadTime)
   }
 
   getNextSpeaker() {

@@ -22,12 +22,32 @@
 
     "build:all": {
       "description": "Build release and debug DMGs",
-      "command": "deno task build && deno task build-debug"
+      "command": "deno task build && deno task build:debug"
+    },
+
+    "clean": {
+      "description": "Remove Tauri/Rust build artifacts so the next build is fresh",
+      "command": "cargo clean --manifest-path src-tauri/Cargo.toml"
+    },
+
+    "rebuild": {
+      "description": "Clean and rebuild the production Tauri app bundle",
+      "command": "deno task clean && deno task build"
+    },
+
+    "rebuild:debug": {
+      "description": "Clean and rebuild the debug Tauri app bundle",
+      "command": "deno task clean && deno task build:debug"
     },
 
     "run:binary": {
       "description": "Run built app binary directly (fast, shows logs in terminal)",
       "command": "./src-tauri/target/release/bundle/macos/Cuebert.app/Contents/MacOS/cuebert"
+    },
+
+    "run:debug": {
+      "description": "Run built debug binary directly (fast, shows logs in terminal)",
+      "command": "./src-tauri/target/debug/cuebert"
     },
 
     "run:app": {

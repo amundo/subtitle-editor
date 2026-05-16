@@ -104,17 +104,18 @@ Deno.test('mergeCues combines timing, text, speaker, and source ids', () => {
   assertEquals(context.changeCount, 1)
 })
 
-Deno.test('deleteCue removes the cue and clears active state', () => {
+Deno.test('deleteCue removes the cue and advances active state', () => {
   const firstCue = { id: 1, start: 0, end: 1, text: 'first' }
   const secondCue = { id: 2, start: 1, end: 2, text: 'second' }
-  const context = createContext([firstCue, secondCue])
+  const thirdCue = { id: 3, start: 2, end: 3, text: 'third' }
+  const context = createContext([firstCue, secondCue, thirdCue])
   context.activeCue = secondCue
   context.activeCueElement = {}
 
   deleteCue.call(context, secondCue)
 
-  assertEquals(context.cues, [firstCue])
-  assertEquals(context.activeCue, null)
+  assertEquals(context.cues, [firstCue, thirdCue])
+  assertEquals(context.activeCue, thirdCue)
   assertEquals(context.activeCueElement, null)
   assertEquals(context.changeCount, 1)
 })

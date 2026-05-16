@@ -58,3 +58,19 @@ Deno.test("getAudibleCueGaps ignores overlaps and tiny boundary gaps", () => {
 
   assertEquals(gaps, []);
 });
+
+Deno.test("getAudibleCueGaps ignores audible gaps shorter than 500ms", () => {
+  const gaps = getAudibleCueGaps(
+    [
+      { id: 1, start: 0, end: 1, text: "first" },
+      { id: 2, start: 1.4, end: 2, text: "second" },
+    ],
+    {
+      envelope: [0, 0.02, 0.02],
+      frameDuration: 0.25,
+    },
+    { threshold: 0.01 },
+  );
+
+  assertEquals(gaps, []);
+});
