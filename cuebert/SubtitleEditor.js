@@ -1644,11 +1644,29 @@ class SubtitleEditor extends HTMLElement {
   }
 
   deleteCue(cue) {
-    const shouldRestoreFocus = this.activeCue === cue || this.keyboardFocusedCue === cue
+    const cueIndex = this.cues.indexOf(cue)
+    const nextFocusCue = cueIndex === -1
+      ? null
+      : this.cues[cueIndex + 1] ?? this.cues[cueIndex - 1] ?? null
+    const focusedCueEditor = document.activeElement?.closest?.('cue-editor')
+    const shouldRestoreFocus = (
+      this.activeCue === cue ||
+      this.keyboardFocusedCue === cue ||
+      focusedCueEditor?.data === cue
+    )
+
     deleteCueOperation.call(this, cue)
-    this.keyboardFocusedCue = this.activeCue
-    if (shouldRestoreFocus && this.activeCue) {
-      this.focusCueText(this.activeCue, { scroll: false })
+    if (shouldRestoreFocus && nextFocusCue && this.cues.includes(nextFocusCue)) {
+      this.activeCue = nextFocusCue
+      this.keyboardFocusedCue = nextFocusCue
+      this.focusCueText(nextFocusCue, { scroll: false })
+      window.requestAnimationFrame?.(() => {
+        if (this.keyboardFocusedCue === nextFocusCue) {
+          this.focusCueText(nextFocusCue, { scroll: false })
+        }
+      })
+    } else {
+      this.keyboardFocusedCue = this.activeCue
     }
   }
 
