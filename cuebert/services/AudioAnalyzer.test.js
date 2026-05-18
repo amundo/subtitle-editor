@@ -1,4 +1,8 @@
-import { getAudibleCueGaps, hasSoundInRange } from "./AudioAnalyzer.js";
+import {
+  buildEnvelope,
+  getAudibleCueGaps,
+  hasSoundInRange,
+} from "./AudioAnalyzer.js";
 
 function assertEquals(actual, expected) {
   if (JSON.stringify(actual) === JSON.stringify(expected)) return;
@@ -18,6 +22,23 @@ Deno.test("hasSoundInRange detects frames above the sound threshold", () => {
 
   assertEquals(hasSoundInRange(audio, 1, 3, { threshold: 0.01 }), true);
   assertEquals(hasSoundInRange(audio, 0, 2, { threshold: 0.01 }), false);
+});
+
+Deno.test("buildEnvelope can sparsely sample frames", () => {
+  const audioBuffer = {
+    sampleRate: 8,
+    getChannelData: () => new Float32Array([1, 1, 1, 1, 0, 0, 0, 0]),
+  };
+
+  const envelope = buildEnvelope(audioBuffer, {
+    windowSize: 4,
+    sampleStride: 2,
+  });
+
+  assertEquals(envelope, {
+    envelope: [1, 0],
+    frameDuration: 0.5,
+  });
 });
 
 Deno.test("getAudibleCueGaps returns only gaps with sound between cues", () => {

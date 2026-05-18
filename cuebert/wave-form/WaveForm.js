@@ -19,26 +19,30 @@ class WaveForm extends HTMLElement {
     this.dragVisibleStart = 0
     this.dragVisibleEnd = 0
     this.suppressNextClick = false
+    this.lazyRenderPending = false
+    this.displayMaxPointsPerSegment = 60
   }
 
   connectedCallback() {
     if (!this.svg) this.render()
   }
 
-  set data({ envelope, frameDuration, start, end, playheadTime, contextWindow } = {}) {
+  set data({ envelope, frameDuration, start, end, playheadTime, contextWindow, lazy = true } = {}) {
     this.envelope = envelope ?? this.envelope
     this.frameDuration = frameDuration ?? this.frameDuration
     this.start = start ?? this.start
     this.end = end ?? this.end
     this.playheadTime = playheadTime ?? this.playheadTime
     this.contextWindow = contextWindow ?? this.contextWindow
+    this.lazyRenderPending = true
 
     if (!this.svg) {
       this.render()
-      return
     }
 
-    this.renderWaveform()
+    if (!lazy) {
+      this.forceRenderWaveform()
+    }
   }
 
   setPlayheadTime(time) {
@@ -63,10 +67,12 @@ class WaveForm extends HTMLElement {
         this.suppressNextClick = false
         return
       }
+      this.forceRenderWaveform()
       this.dispatchTimeEvent('waveformseek', this.getTimeFromPointerEvent(event))
     })
 
     this.svg.addEventListener('pointerdown', event => {
+      this.forceRenderWaveform()
       const edge = event.target?.dataset?.edge
       if (!edge) return
 
@@ -105,6 +111,10 @@ class WaveForm extends HTMLElement {
       this.draggingEdge = null
       this.classList.remove('is-dragging')
     })
+  }
+
+  forceRenderWaveform() {
+    this.lazyRenderPending = false
     this.renderWaveform()
   }
 
@@ -142,9 +152,9 @@ class WaveForm extends HTMLElement {
     const i2 = Math.floor(tCurrEnd / fd)
     const i3 = Math.floor(tNextEnd / fd)
 
-    const prevSlice = env.slice(i0, i1)
-    const currSlice = env.slice(i1, i2)
-    const nextSlice = env.slice(i2, i3)
+    const prevSlice = this.downsampleSlice(env.slice(i0, i1), this.displayMaxPointsPerSegment)
+    const currSlice = this.downsampleSlice(env.slice(i1, i2), this.displayMaxPointsPerSegment)
+    const nextSlice = this.downsampleSlice(env.slice(i2, i3), this.displayMaxPointsPerSegment)
 
     const dPrev = (i1 - i0) * fd
     const dCurr = (i2 - i1) * fd
@@ -155,7 +165,7 @@ class WaveForm extends HTMLElement {
     const height = 40
     const bottomY = height
 
-    const visibleSlice = env.slice(i0, i3)
+    const visibleSlice = [...prevSlice, ...currSlice, ...nextSlice]
     const max = Math.max(...visibleSlice) || 1
 
     const buildAreaPath = (slice, xStart, xEnd) => {
@@ -208,6 +218,24 @@ class WaveForm extends HTMLElement {
     `
     this.playheadElement = this.svg.querySelector('.wf-playhead')
     this.updatePlayhead()
+  }
+
+  downsampleSlice(slice, maxPoints) {
+    if (!slice.length || slice.length <= maxPoints) return slice
+
+    const bucketSize = slice.length / maxPoints
+    return Array.from({ length: maxPoints }, (_, bucketIndex) => {
+      const startIndex = Math.floor(bucketIndex * bucketSize)
+      const endIndex = Math.min(
+        slice.length,
+        Math.max(startIndex + 1, Math.ceil((bucketIndex + 1) * bucketSize))
+      )
+      let max = 0
+      for (let index = startIndex; index < endIndex; index += 1) {
+        max = Math.max(max, slice[index] ?? 0)
+      }
+      return max
+    })
   }
 
   updatePlayhead() {
