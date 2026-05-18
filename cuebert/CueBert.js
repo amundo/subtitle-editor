@@ -1,4 +1,4 @@
-// SubtitleEditor.js
+// CueBert.js
 import './cue-editor/CueEditor.js'
 import './cue-list-view/CueListView.js'
 import { formatTime, parseTime } from './services/time.js'
@@ -14,7 +14,7 @@ import {
   splitCue as splitCueOperation
 } from './services/CueOperations.js'
 
-class SubtitleEditor extends HTMLElement {
+class CueBert extends HTMLElement {
   constructor() {
     super()
 
@@ -1836,5 +1836,5 @@ class SubtitleEditor extends HTMLElement {
   }
 }
 
-customElements.define('cue-bert', SubtitleEditor)
-export { SubtitleEditor }
+customElements.define('cue-bert', CueBert)
+export { CueBert }

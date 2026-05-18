@@ -15,7 +15,7 @@ class CueEditor extends HTMLElement {
     this.playheadTime = null
     this.contextWindow = 0.75 // seconds
 
-    // callbacks wired by SubtitleEditor
+    // callbacks wired by CueBert
     this.onPlayCue = null
     this.onSetSpeaker = null
     this.onSplitCue = null
