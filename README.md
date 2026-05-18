@@ -4,7 +4,7 @@ author: Patrick Hall
 description: Cuebert is a web-based subtitle editing tool for transcribing VTT files from audio or video.
 ---
 
-This is aan exprimental UI for editing subtitles (VTT format) directly from media. 
+This is an exprimental UI for editing subtitles (VTT format) directly from media. 
 
 ## Background
 
@@ -20,11 +20,11 @@ Rather than using a single global waveform to represent the whole media file, an
 
 ## Technical details
 
-This tool is a web application built with Web Standards. As of now it is purely client-side. 
+This tool is a web application built with Web Standards. As of now, there is no server code; the app is entirely client-side. The media file is loaded directly into the browser, and the VTT file is also loaded directly into the browser. The app then processes the media file to create waveforms for each cue, and displays them alongside the text of each cue for editing.
 
 ## Desktop wrapper
 
-This repo now includes a minimal Tauri wrapper in `src-tauri/` and Deno tasks in `deno.json`.
+This repo now includes a [Tauri](https://tauri.app/) wrapper in `src-tauri/` and Deno tasks in `deno.json`.
 
 Prerequisites:
 
@@ -48,4 +48,4 @@ The Tauri app points directly at the existing static frontend in `cuebert/`, so 
 
 ### Audio analysis
 
-Waveforms are created by analyzing the audio data using the Web Audio API. The audio file is loaded into an AudioBuffer, and then the samples are processed to create a visual representation of the waveform. Simple waveforms are rendered with lightweight `SVG` elements for scalability and performance. 
+Waveforms are created by analyzing the audio data using the [`Web Audio API`](https://developer.mozilla.org/en-US/docs/Web/API/Web_Audio_API). The audio file is loaded into an AudioBuffer, and then the samples are processed to create a visual representation of the waveform. Simple waveforms are rendered with lightweight `SVG` elements for scalability and performance. 

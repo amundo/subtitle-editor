@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Pat" />
+  <title>Cuebert Tutorial Syllabus</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Cuebert Tutorial Syllabus</h1>
+<p class="author">Pat</p>
+</header>
+<p>Cuebert is a subtitle editor for reviewing and correcting
+machine-generated transcripts. It is built around cue-by-cue editing:
+each subtitle cue has its own text, timing controls, speaker label, and
+local waveform. The goal is to make subtitle correction feel less like
+navigating a long timeline and more like working through a clear list of
+moments in the media.</p>
+<p>This syllabus introduces the software as a guided tutorial. By the
+end, a learner should understand the main editing workflow, how cue
+timing relates to audio, how autosave and export work, and how to reason
+about common subtitle-editing decisions.</p>
+<h2 id="what-cuebert-edits">1. What Cuebert Edits</h2>
+<p>A subtitle file is a sequence of cues. Each cue has:</p>
+<ul>
+<li>a start time</li>
+<li>an end time</li>
+<li>subtitle text</li>
+<li>an optional speaker label</li>
+<li>optional source metadata from the original transcript</li>
+</ul>
+<p>Cuebert can load transcript formats such as VTT and aTrain-style
+JSON, then present those cues as editable blocks. The media file
+provides playback and waveform context, but the cue list is the primary
+workspace.</p>
+<h3 id="try-it">Try It</h3>
+<ol type="1">
+<li>Open Cuebert.</li>
+<li>Load a transcript.</li>
+<li>Load or auto-load the matching media file.</li>
+<li>Scroll through the cue list and identify where timing, speaker,
+text, and waveform controls appear.</li>
+</ol>
+<h3 id="study-questions">Study Questions</h3>
+<ol type="1">
+<li>What information does a subtitle cue need in order to appear at the
+right time?</li>
+<li>Why might a cue list be easier to edit than a single global
+timeline?</li>
+<li>What parts of a cue can change without changing the text?</li>
+</ol>
+<h2 id="the-main-editing-loop">2. The Main Editing Loop</h2>
+<p>Most correction work follows a repeated loop:</p>
+<ol type="1">
+<li>Focus a cue.</li>
+<li>Play the cue.</li>
+<li>Compare the text to the audio.</li>
+<li>Correct the text.</li>
+<li>Adjust the cue boundaries if the subtitle starts or ends too early
+or too late.</li>
+<li>Move to the next cue.</li>
+</ol>
+<p>Cuebert keeps the current cue near the center of the workflow. The
+play button on a cue previews that cue’s time range. The bottom
+transport controls play or pause the media globally.</p>
+<h3 id="try-it-1">Try It</h3>
+<ol type="1">
+<li>Click into a cue’s text box.</li>
+<li>Use the cue play button to preview that cue.</li>
+<li>Edit the text.</li>
+<li>Move to the next cue and repeat.</li>
+</ol>
+<h3 id="study-questions-1">Study Questions</h3>
+<ol type="1">
+<li>When should you edit text, and when should you adjust timing?</li>
+<li>What is the difference between playing a cue and playing the media
+from the transport bar?</li>
+<li>Why is it useful for cue playback to stop at the cue’s end
+time?</li>
+</ol>
+<h2 id="working-with-waveforms">3. Working With Waveforms</h2>
+<p>Cuebert renders a compact waveform for each cue. The center region
+represents the cue itself, while nearby audio gives context before and
+after the cue. This makes it easier to see whether speech begins before
+the cue, continues after it, or includes silence inside the current
+timing.</p>
+<p>The waveform is not a substitute for listening. It is a visual guide
+that helps the editor decide where to listen closely and where timing
+may need adjustment.</p>
+<h3 id="try-it-2">Try It</h3>
+<ol type="1">
+<li>Find a cue where the waveform starts before the cue boundary.</li>
+<li>Listen to the cue.</li>
+<li>Adjust the start or end boundary if the subtitle appears too early
+or too late.</li>
+<li>Preview the cue again.</li>
+</ol>
+<h3 id="study-questions-2">Study Questions</h3>
+<ol type="1">
+<li>What can a waveform show that text cannot?</li>
+<li>Why should timing changes be checked by listening, not only by
+looking?</li>
+<li>What might a quiet section inside a cue indicate?</li>
+</ol>
+<h2 id="splitting-merging-and-deleting-cues">4. Splitting, Merging, and
+Deleting Cues</h2>
+<p>Cuebert supports structural cue edits:</p>
+<ul>
+<li>Split a cue when one subtitle contains two distinct subtitle
+moments.</li>
+<li>Merge cues when one thought was divided too aggressively.</li>
+<li>Delete a cue when it is empty, duplicated, or not useful.</li>
+</ul>
+<p>After deleting a focused cue, focus should move to the next cue so
+editing can continue without breaking the flow. If there is no next cue,
+focus should move to the previous cue.</p>
+<h3 id="try-it-3">Try It</h3>
+<ol type="1">
+<li>Split a cue at the current media timestamp.</li>
+<li>Merge two adjacent cues.</li>
+<li>Delete a cue and observe where focus goes next.</li>
+</ol>
+<h3 id="study-questions-3">Study Questions</h3>
+<ol type="1">
+<li>What makes a cue a good candidate for splitting?</li>
+<li>What risks come with merging two cues?</li>
+<li>After deleting a cue, why should focus move to the next cue rather
+than disappearing?</li>
+</ol>
+<h2 id="speaker-labels">5. Speaker Labels</h2>
+<p>Speaker labels help identify who is talking. Cuebert allows a cue to
+have a speaker, no speaker, or a renamed speaker. Consistent speaker
+labels make exported transcripts easier to read and review.</p>
+<p>Speaker labels should be meaningful, brief, and consistent. For
+example, use <code>Host</code> and <code>Guest</code> consistently
+instead of alternating between <code>host</code>,
+<code>Interviewer</code>, and <code>Speaker 1</code> unless those labels
+mean different people.</p>
+<h3 id="try-it-4">Try It</h3>
+<ol type="1">
+<li>Assign a speaker to a cue.</li>
+<li>Rename a speaker.</li>
+<li>Clear a speaker from a cue that does not need one.</li>
+</ol>
+<h3 id="study-questions-4">Study Questions</h3>
+<ol type="1">
+<li>When does a subtitle cue need a speaker label?</li>
+<li>What problems can inconsistent speaker names create?</li>
+<li>Why might some cues intentionally have no speaker?</li>
+</ol>
+<h2 id="finding-and-reviewing-cues">6. Finding and Reviewing Cues</h2>
+<p>Cuebert includes cue search for finding words, names, or repeated
+errors. Search can be used as a review tool after the first editing
+pass.</p>
+<p>Useful search tasks include:</p>
+<ul>
+<li>checking spelling of names</li>
+<li>finding repeated filler words</li>
+<li>reviewing all cues from a specific speaker</li>
+<li>locating empty or suspicious cues</li>
+</ul>
+<h3 id="try-it-5">Try It</h3>
+<ol type="1">
+<li>Search for a word that appears multiple times.</li>
+<li>Toggle match-case or whole-word matching.</li>
+<li>Clear the search and return to the cue in context.</li>
+</ol>
+<h3 id="study-questions-5">Study Questions</h3>
+<ol type="1">
+<li>How can search help after a transcript has already been edited
+once?</li>
+<li>When is whole-word matching more useful than a regular text
+search?</li>
+<li>What kinds of subtitle problems are easiest to find by search?</li>
+</ol>
+<h2 id="gap-cues-and-missing-audio">7. Gap Cues and Missing Audio</h2>
+<p>Cuebert can detect places where there is audible sound between
+existing cues and insert empty generated gap cues. These help editors
+notice speech or sound that the original transcript may have missed.</p>
+<p>Short gaps are ignored unless they meet the minimum cue duration.
+This prevents very small audio fragments from becoming distracting cue
+candidates.</p>
+<h3 id="try-it-6">Try It</h3>
+<ol type="1">
+<li>Load a transcript and matching media.</li>
+<li>Look for empty generated cues.</li>
+<li>Listen to each generated cue.</li>
+<li>Add text if speech is present, or delete the cue if it is not
+useful.</li>
+</ol>
+<h3 id="study-questions-6">Study Questions</h3>
+<ol type="1">
+<li>Why might an automatic transcript miss audio between cues?</li>
+<li>Why should Cuebert ignore very short gaps?</li>
+<li>What should an editor do with an empty generated gap cue?</li>
+</ol>
+<h2 id="autosave-and-export">8. Autosave and Export</h2>
+<p>Cuebert can autosave work in a Cuebert JSON format so editing state
+is preserved. It can also export subtitle or text formats for sharing
+and publishing.</p>
+<p>Use autosave for ongoing work. Use export when the transcript is
+ready to leave Cuebert or be used somewhere else.</p>
+<h3 id="try-it-7">Try It</h3>
+<ol type="1">
+<li>Confirm that autosave is enabled.</li>
+<li>Make a small edit.</li>
+<li>Export a Cuebert JSON copy.</li>
+<li>Export a VTT or TXT version.</li>
+</ol>
+<h3 id="study-questions-7">Study Questions</h3>
+<ol type="1">
+<li>What is the difference between saving editing state and exporting a
+final subtitle file?</li>
+<li>Why is autosave useful during subtitle correction?</li>
+<li>Which export format would you choose for a video player, and
+why?</li>
+</ol>
+<h2 id="keyboard-workflow">9. Keyboard Workflow</h2>
+<p>Cuebert is designed for repeated editing, so keyboard shortcuts help
+reduce unnecessary clicking. Important workflows include playing the
+current cue, moving between cue text boxes, searching, and deleting with
+confirmation.</p>
+<p>The exact shortcuts are shown inside the app’s keyboard shortcut
+guide.</p>
+<h3 id="try-it-8">Try It</h3>
+<ol type="1">
+<li>Open the keyboard shortcut guide.</li>
+<li>Practice playing the current cue from the keyboard.</li>
+<li>Move between cue text boxes.</li>
+<li>Delete a cue and confirm that focus moves to the next cue.</li>
+</ol>
+<h3 id="study-questions-8">Study Questions</h3>
+<ol type="1">
+<li>Which actions happen often enough to deserve keyboard
+shortcuts?</li>
+<li>Why should destructive actions, such as deleting a cue, still
+require confirmation?</li>
+<li>How does keyboard focus affect editing speed?</li>
+</ol>
+<h2 id="final-practice-project">10. Final Practice Project</h2>
+<p>Choose a short audio or video clip with a draft transcript. Edit it
+in Cuebert from start to finish.</p>
+<p>Your finished project should have:</p>
+<ul>
+<li>corrected subtitle text</li>
+<li>reasonable cue start and end times</li>
+<li>consistent speaker labels where useful</li>
+<li>reviewed gap cues</li>
+<li>no obvious duplicate, empty, or misplaced cues</li>
+<li>an exported final file</li>
+</ul>
+<h3 id="final-study-questions">Final Study Questions</h3>
+<ol type="1">
+<li>What were the most common errors in the draft transcript?</li>
+<li>Which cues needed timing changes, and why?</li>
+<li>How did waveform context change your editing decisions?</li>
+<li>What checks did you perform before export?</li>
+<li>If you were editing a longer transcript, what workflow would help
+you stay consistent?</li>
+</ol>
+</body>
+</html>

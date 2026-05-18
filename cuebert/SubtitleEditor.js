@@ -145,6 +145,9 @@ class SubtitleEditor extends HTMLElement {
                 type="search"
                 placeholder="Search text or speaker…"
                 autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck="false"
               >
             </label>
             <label class="cue-search-option">
@@ -283,44 +286,15 @@ class SubtitleEditor extends HTMLElement {
   }
 
   cacheElements() {
-    this.video = this.querySelector('[data-role="video"]')
-    this.previewTrack = this.querySelector('[data-role="previewTrack"]')
-    this.currentTimeLabel = this.querySelector('[data-role="currentTime"]')
-    this.durationTimeLabel = this.querySelector('[data-role="durationTime"]')
-    this.mediaPlayBtn = this.querySelector('[data-role="mediaPlayBtn"]')
-    this.mediaSeek = this.querySelector('[data-role="mediaSeek"]')
-    this.mediaMuteBtn = this.querySelector('[data-role="mediaMuteBtn"]')
-    this.mediaVolume = this.querySelector('[data-role="mediaVolume"]')
-    this.playbackSpeedBtn = this.querySelector('[data-role="playbackSpeedBtn"]')
-    this.playbackSpeedValue = this.querySelector('[data-role="playbackSpeedValue"]')
-    this.mediaLoadControl = this.querySelector('[data-role="mediaLoadControl"]')
-    this.videoFileInput = this.querySelector('[data-role="videoFile"]')
-    this.vttFileInput = this.querySelector('[data-role="vttFile"]')
-    this.cueList = this.querySelector('[data-role="cueList"]')
-    this.cueSearchRow = this.querySelector('[data-role="cueSearchRow"]')
-    this.cueSearchInput = this.querySelector('[data-role="cueSearchInput"]')
-    this.cueSearchMatchCaseInput = this.querySelector('[data-role="cueSearchMatchCase"]')
-    this.cueSearchWholeWordsInput = this.querySelector('[data-role="cueSearchWholeWords"]')
-    this.cueSearchCount = this.querySelector('[data-role="cueSearchCount"]')
-    this.clearCueSearchBtn = this.querySelector('[data-role="clearCueSearchBtn"]')
-    this.saveBtn = this.querySelector('[data-role="saveBtn"]')
-    this.downloadBtn = this.querySelector('[data-role="downloadBtn"]')
-    this.downloadTextBtn = this.querySelector('[data-role="downloadTextBtn"]')
-    this.autosaveStatus = this.querySelector('[data-role="autosaveStatus"]')
-    this.autosaveToggle = this.querySelector('[data-role="autosaveToggle"]')
-    this.shortcutGuideBtn = this.querySelector('[data-role="shortcutGuideBtn"]')
-    this.shortcutGuideDialog = this.querySelector('[data-role="shortcutGuideDialog"]')
-    this.closeShortcutGuideBtn = this.querySelector('[data-role="closeShortcutGuideBtn"]')
-    this.editSpeakersBtn = this.querySelector('[data-role="editSpeakersBtn"]')
-    this.speakerDialog = this.querySelector('[data-role="speakerDialog"]')
-    this.closeSpeakerDialogBtn = this.querySelector('[data-role="closeSpeakerDialogBtn"]')
-    this.addSpeakerForm = this.querySelector('[data-role="addSpeakerForm"]')
-    this.addSpeakerInput = this.querySelector('[data-role="addSpeakerInput"]')
-    this.speakerList = this.querySelector('[data-role="speakerList"]')
+    this.querySelectorAll('[data-role]').forEach(element => {
+      this[element.dataset.role] = element
+    })
+
     this.cuebertLogo = this.querySelector('#cuebert-logo')
+
     this.adjustFontSizeButtons = {
-      increase: this.querySelector('[data-role="increaseFontBtn"]'),
-      decrease: this.querySelector('[data-role="decreaseFontBtn"]')
+      increase: this.increaseFontBtn,
+      decrease: this.decreaseFontBtn
     }
   }
 
@@ -471,7 +445,7 @@ class SubtitleEditor extends HTMLElement {
   }
 
   bindFileEvents() {
-    this.videoFileInput.addEventListener('change', e => {
+    this.videoFile.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       this.mediaLoadedFromPath = this.getFilePath(file)
@@ -488,7 +462,7 @@ class SubtitleEditor extends HTMLElement {
       this.updateMediaLoadControlVisibility()
     })
 
-    this.vttFileInput.addEventListener('click', e => {
+    this.vttFile.addEventListener('click', e => {
       if (!this.canUseNativeTranscriptPicker()) return
 
       e.preventDefault()
@@ -498,7 +472,7 @@ class SubtitleEditor extends HTMLElement {
       })
     })
 
-    this.vttFileInput.addEventListener('change', e => {
+    this.vttFile.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       file.text().then(text => {
@@ -883,6 +857,7 @@ class SubtitleEditor extends HTMLElement {
   loadTranscriptText(text, { fileName = '', sourcePath = null } = {}) {
     const document = this.transcriptDocument.parseText(text, { fileName, sourcePath })
     this.cues = document.cues
+
     this.loadedTranscript = document.sourceData
     this.loadedTranscriptFormat = document.format
     this.loadedTranscriptPath = document.path

@@ -146,7 +146,7 @@ class CueEditor extends HTMLElement {
 
     this.textarea.addEventListener('input', () => {
       this.#data.text = this.textarea.value
-      this.dispatchEvent(new CustomEvent('cuechange'))
+      this.dispatchEvent(new CustomEvent('cuechange', { bubbles: true }))
     })
 
     this.textarea.addEventListener('keydown', event => {

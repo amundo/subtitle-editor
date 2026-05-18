@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <meta name="author" content="Pat" />
+  <title>Cuebert Developer Syllabus</title>
+  <style>
+    html {
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+    /* CSS for syntax highlighting */
+    html { -webkit-text-size-adjust: 100%; }
+    pre > code.sourceCode { white-space: pre; position: relative; }
+    pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+    pre > code.sourceCode > span:empty { height: 1.2em; }
+    .sourceCode { overflow: visible; }
+    code.sourceCode > span { color: inherit; text-decoration: inherit; }
+    div.sourceCode { margin: 1em 0; }
+    pre.sourceCode { margin: 0; }
+    @media screen {
+    div.sourceCode { overflow: auto; }
+    }
+    @media print {
+    pre > code.sourceCode { white-space: pre-wrap; }
+    pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+    }
+    pre.numberSource code
+      { counter-reset: source-line 0; }
+    pre.numberSource code > span
+      { position: relative; left: -4em; counter-increment: source-line; }
+    pre.numberSource code > span > a:first-child::before
+      { content: counter(source-line);
+        position: relative; left: -1em; text-align: right; vertical-align: baseline;
+        border: none; display: inline-block;
+        -webkit-touch-callout: none; -webkit-user-select: none;
+        -khtml-user-select: none; -moz-user-select: none;
+        -ms-user-select: none; user-select: none;
+        padding: 0 4px; width: 4em;
+        color: #aaaaaa;
+      }
+    pre.numberSource { margin-left: 3em; border-left: 1px solid #aaaaaa;  padding-left: 4px; }
+    div.sourceCode
+      {   }
+    @media screen {
+    pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+    }
+    code span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code span.at { color: #7d9029; } /* Attribute */
+    code span.bn { color: #40a070; } /* BaseN */
+    code span.bu { color: #008000; } /* BuiltIn */
+    code span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code span.ch { color: #4070a0; } /* Char */
+    code span.cn { color: #880000; } /* Constant */
+    code span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code span.dt { color: #902000; } /* DataType */
+    code span.dv { color: #40a070; } /* DecVal */
+    code span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code span.ex { } /* Extension */
+    code span.fl { color: #40a070; } /* Float */
+    code span.fu { color: #06287e; } /* Function */
+    code span.im { color: #008000; font-weight: bold; } /* Import */
+    code span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+    code span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code span.op { color: #666666; } /* Operator */
+    code span.ot { color: #007020; } /* Other */
+    code span.pp { color: #bc7a00; } /* Preprocessor */
+    code span.sc { color: #4070a0; } /* SpecialChar */
+    code span.ss { color: #bb6688; } /* SpecialString */
+    code span.st { color: #4070a0; } /* String */
+    code span.va { color: #19177c; } /* Variable */
+    code span.vs { color: #4070a0; } /* VerbatimString */
+    code span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Cuebert Developer Syllabus</h1>
+<p class="author">Pat</p>
+</header>
+<p>This syllabus is a guided introduction to how Cuebert works as a
+codebase. It is meant for developers who need to read, debug, extend, or
+review the software. The focus is not only what each file does, but how
+state and events move through the app.</p>
+<p>Cuebert is mostly a static web application in <code>cuebert/</code>,
+wrapped by a small Tauri desktop shell in <code>src-tauri/</code>. The
+frontend uses native custom elements, browser media APIs, Web Audio,
+SVG, and small service modules. There is no framework build step.</p>
+<h2 id="learning-goals">Learning Goals</h2>
+<p>By the end, a developer should be able to:</p>
+<ul>
+<li>trace transcript loading from file input to rendered cue
+editors</li>
+<li>explain the core cue data model</li>
+<li>understand how <code>SubtitleEditor</code> coordinates services and
+components</li>
+<li>modify cue operations safely</li>
+<li>debug playback, preview tracks, waveform interactions, and focus
+behavior</li>
+<li>add focused Deno tests for service-level logic</li>
+<li>understand the boundary between web frontend code and Tauri
+commands</li>
+</ul>
+<h2 id="repository-map">1. Repository Map</h2>
+<p>Start by learning the major folders:</p>
+<ul>
+<li><code>cuebert/</code>: static frontend application</li>
+<li><code>cuebert/SubtitleEditor.js</code>: main app custom element and
+orchestration layer</li>
+<li><code>cuebert/cue-editor/</code>: one cue editor component</li>
+<li><code>cuebert/cue-list-view/</code>: cue list renderer and
+virtualization layer</li>
+<li><code>cuebert/wave-form/</code>: SVG waveform component</li>
+<li><code>cuebert/services/</code>: logic modules with most test
+coverage</li>
+<li><code>src-tauri/</code>: desktop wrapper, filesystem commands,
+logging, and packaging</li>
+<li><code>deno.json</code>: developer tasks for Tauri, builds, logs, and
+tests</li>
+</ul>
+<h3 id="reading-assignment">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>README.md</code></li>
+<li><code>deno.json</code></li>
+<li><code>cuebert/index.html</code></li>
+<li><code>cuebert/SubtitleEditor.js</code> constructor and
+<code>initialize()</code></li>
+</ul>
+<h3 id="lab">Lab</h3>
+<p>Run the service tests:</p>
+<div class="sourceCode" id="cb1"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> test cuebert/services/<span class="pp">*</span>.test.js</span></code></pre></div>
+<p>Then run the app in development:</p>
+<div class="sourceCode" id="cb2"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> task dev</span></code></pre></div>
+<h3 id="study-questions">Study Questions</h3>
+<ol type="1">
+<li>Which parts of the app are plain browser code, and which parts
+require Tauri?</li>
+<li>Why is <code>SubtitleEditor.js</code> the best starting point for
+tracing behavior?</li>
+<li>What does the project gain by keeping most logic in
+<code>cuebert/services/</code>?</li>
+</ol>
+<h2 id="the-core-data-model">2. The Core Data Model</h2>
+<p>The central data structure is the cue. A cue is a plain object with
+fields such as:</p>
+<ul>
+<li><code>id</code></li>
+<li><code>start</code></li>
+<li><code>end</code></li>
+<li><code>text</code></li>
+<li><code>speaker</code></li>
+<li><code>sourceSegmentId</code> or <code>sourceSegmentIds</code></li>
+<li><code>generatedFromAudioGap</code></li>
+</ul>
+<p>The app usually mutates cue objects directly, then calls
+<code>afterCueChange()</code> to re-render, mark dirty state, refresh
+preview subtitles, and schedule autosave.</p>
+<h3 id="reading-assignment-1">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/TranscriptParser.js</code></li>
+<li><code>cuebert/services/TranscriptExporter.js</code></li>
+<li><code>cuebert/services/CueOperations.js</code></li>
+<li><code>cuebert/services/CueOperations.test.js</code></li>
+</ul>
+<h3 id="lab-1">Lab</h3>
+<p>Add a temporary <code>console.log(this.cues)</code> after transcript
+loading, load a transcript, and inspect the cue objects. Remove the log
+afterward.</p>
+<h3 id="study-questions-1">Study Questions</h3>
+<ol type="1">
+<li>How does Cuebert normalize VTT cues and aTrain JSON segments into
+one editing model?</li>
+<li>Why does <code>sourceSegmentIds</code> matter after splitting or
+merging cues?</li>
+<li>What must happen after mutating <code>this.cues</code>?</li>
+</ol>
+<h2 id="subtitleeditor-as-the-coordinator">3.
+<code>SubtitleEditor</code> as the Coordinator</h2>
+<p><code>SubtitleEditor</code> owns the main application state and wires
+together all components. It renders the shell, caches DOM nodes, binds
+events, loads files, tracks media state, renders cues, and delegates
+business logic to services.</p>
+<p>Important state groups include:</p>
+<ul>
+<li>transcript state: <code>cues</code>, <code>loadedTranscript</code>,
+<code>loadedTranscriptFormat</code>,
+<code>loadedTranscriptPath</code></li>
+<li>media state: <code>mediaLoadedFromPath</code>,
+<code>autoLoadedMediaPath</code>, <code>mediaLoadedManually</code></li>
+<li>playback state: <code>previewEnd</code>, <code>playbackCue</code>,
+<code>transportPlaybackHighlightActive</code></li>
+<li>autosave state: <code>hasUnsavedChanges</code>,
+<code>changeRevision</code>, autosave timers</li>
+<li>audio analysis state: <code>audioBuffer</code>,
+<code>envelope</code>, <code>frameDuration</code></li>
+<li>focus state: <code>activeCue</code>,
+<code>keyboardFocusedCue</code>, cue element maps</li>
+</ul>
+<h3 id="reading-assignment-2">Reading Assignment</h3>
+<p>Read these methods in <code>cuebert/SubtitleEditor.js</code>:</p>
+<ul>
+<li><code>constructor()</code></li>
+<li><code>renderShell()</code></li>
+<li><code>cacheElements()</code></li>
+<li><code>bindEvents()</code></li>
+<li><code>loadTranscriptDocument()</code></li>
+<li><code>renderCues()</code></li>
+<li><code>afterCueChange()</code></li>
+<li><code>deleteCue()</code></li>
+</ul>
+<h3 id="lab-2">Lab</h3>
+<p>Trace what happens when a user edits cue text:</p>
+<ol type="1">
+<li><code>CueEditor</code> emits <code>cuechange</code>.</li>
+<li><code>CueListView</code> handler calls the parent callback.</li>
+<li><code>SubtitleEditor</code> calls
+<code>afterCueChange()</code>.</li>
+<li>Preview track and autosave are scheduled.</li>
+</ol>
+<p>Write a short note explaining each step.</p>
+<h3 id="study-questions-2">Study Questions</h3>
+<ol type="1">
+<li>Which responsibilities still live inside
+<code>SubtitleEditor</code>?</li>
+<li>Which responsibilities have already been extracted to services?</li>
+<li>What risks come from re-rendering cue editors after every cue
+change?</li>
+</ol>
+<h2 id="component-boundaries">4. Component Boundaries</h2>
+<p>Cuebert uses custom elements as UI components:</p>
+<ul>
+<li><code>cue-list-view</code>: renders cue editors, merge rows, and
+virtualized ranges</li>
+<li><code>cue-editor</code>: renders one cue’s speaker, play, timing,
+waveform, text, split, and delete controls</li>
+<li><code>wave-form</code>: renders local waveform context and emits
+seek or boundary events</li>
+<li><code>cue-bert</code>: the full app shell</li>
+</ul>
+<p>The child components do not own global app state. They emit callbacks
+or custom events, and <code>SubtitleEditor</code> decides how app state
+changes.</p>
+<h3 id="reading-assignment-3">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/cue-list-view/CueListView.js</code></li>
+<li><code>cuebert/cue-editor/CueEditor.js</code></li>
+<li><code>cuebert/wave-form/WaveForm.js</code></li>
+</ul>
+<h3 id="lab-3">Lab</h3>
+<p>Trace a waveform boundary drag:</p>
+<ol type="1">
+<li><code>WaveForm</code> emits
+<code>waveformboundarychange</code>.</li>
+<li><code>CueEditor</code> forwards it through
+<code>onWaveformBoundaryChange</code>.</li>
+<li><code>CueListView</code> forwards the cue and detail.</li>
+<li><code>SubtitleEditor</code> previews labels or commits the timing
+change.</li>
+</ol>
+<h3 id="study-questions-3">Study Questions</h3>
+<ol type="1">
+<li>Why should <code>WaveForm</code> not mutate a cue directly?</li>
+<li>What does <code>CueListView</code> need to know in order to
+virtualize long cue lists?</li>
+<li>How does <code>ensureCueRendered()</code> support focus and playback
+state?</li>
+</ol>
+<h2 id="transcript-parsing-and-export">5. Transcript Parsing and
+Export</h2>
+<p>Cuebert accepts VTT and JSON-like transcript inputs. Parsing turns
+source formats into the shared cue model. Export turns the current cue
+model back into VTT, plain text, or Cuebert/aTrain JSON.</p>
+<p><code>TranscriptDocument</code> is a facade over parsing, export,
+metadata syncing, and title derivation.</p>
+<h3 id="reading-assignment-4">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/TranscriptDocument.js</code></li>
+<li><code>cuebert/services/TranscriptParser.js</code></li>
+<li><code>cuebert/services/TranscriptExporter.js</code></li>
+<li><code>cuebert/services/TranscriptDocument.test.js</code></li>
+<li><code>cuebert/services/TranscriptExporter.test.js</code></li>
+</ul>
+<h3 id="lab-4">Lab</h3>
+<p>Create a tiny test fixture in your head:</p>
+<pre class="text"><code>WEBVTT
+
+1
+00:00:00.000 --&gt; 00:00:01.000
+Hello</code></pre>
+<p>Trace how it becomes a cue and how it exports back to VTT.</p>
+<h3 id="study-questions-4">Study Questions</h3>
+<ol type="1">
+<li>What data is lost when importing VTT compared with aTrain JSON?</li>
+<li>Why does <code>buildAtrainJson()</code> clone source segments
+instead of creating every segment from scratch?</li>
+<li>Why does an empty generated gap cue export with a zero-width
+character in VTT?</li>
+</ol>
+<h2 id="cue-operations">6. Cue Operations</h2>
+<p>Structural edits are isolated in <code>CueOperations.js</code>:</p>
+<ul>
+<li><code>splitCue()</code></li>
+<li><code>mergeCues()</code></li>
+<li><code>deleteCue()</code></li>
+</ul>
+<p>These functions are called with <code>this</code> bound to
+<code>SubtitleEditor</code>, which gives them access to shared helpers
+and state. This is a transitional pattern: it keeps operation logic
+testable while still using app methods.</p>
+<h3 id="reading-assignment-5">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/CueOperations.js</code></li>
+<li><code>cuebert/services/CueOperations.test.js</code></li>
+<li><code>SubtitleEditor.splitCue()</code></li>
+<li><code>SubtitleEditor.mergeCues()</code></li>
+<li><code>SubtitleEditor.deleteCue()</code></li>
+</ul>
+<h3 id="lab-5">Lab</h3>
+<p>Follow a delete operation from the cue delete button to focus
+restoration:</p>
+<ol type="1">
+<li><code>CueEditor.confirmDeleteCue()</code></li>
+<li><code>CueListView</code> <code>onDeleteCue</code></li>
+<li><code>SubtitleEditor.deleteCue()</code></li>
+<li><code>deleteCueOperation.call(this, cue)</code></li>
+<li><code>afterCueChange()</code></li>
+<li>focus moves to the next cue</li>
+</ol>
+<h3 id="study-questions-5">Study Questions</h3>
+<ol type="1">
+<li>Why does deletion choose the next cue before removing the current
+cue?</li>
+<li>What should happen when the last cue is deleted?</li>
+<li>What should operation tests cover, and what needs browser-level
+verification?</li>
+</ol>
+<h2 id="playback-and-preview-state">7. Playback and Preview State</h2>
+<p>Playback is managed by <code>TransportController</code>. It owns
+transport controls, play/pause state, playback speed, seeking, cue
+preview ranges, and UI labels.</p>
+<p><code>SubtitleEditor</code> owns higher-level cue highlighting and
+preview track generation. The HTML <code>&lt;video&gt;</code> element is
+hidden but drives media playback and subtitle timing.</p>
+<h3 id="reading-assignment-6">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/TransportController.js</code></li>
+<li><code>cuebert/services/TransportController.test.js</code></li>
+<li><code>cuebert/services/PreviewTrackController.js</code></li>
+<li>playback-related methods in <code>SubtitleEditor.js</code></li>
+</ul>
+<h3 id="lab-6">Lab</h3>
+<p>Trace what happens when the cue play button is clicked:</p>
+<ol type="1">
+<li><code>CueEditor</code> calls <code>onPlayCue</code>.</li>
+<li><code>CueListView</code> forwards the cue.</li>
+<li><code>SubtitleEditor.renderCues()</code> handler calls
+<code>transportController.toggleTimeRange()</code>.</li>
+<li><code>TransportController</code> starts or stops a cue preview.</li>
+<li><code>timeupdate</code> events update labels, waveform playheads,
+and cue highlighting.</li>
+</ol>
+<h3 id="study-questions-6">Study Questions</h3>
+<ol type="1">
+<li>Why does <code>TransportController</code> track pending playback
+separately from <code>video.paused</code>?</li>
+<li>Why does cue preview state need both a start and end range?</li>
+<li>What is the difference between text track cue highlighting and
+transport-driven highlighting?</li>
+</ol>
+<h2 id="audio-analysis-and-gap-cues">8. Audio Analysis and Gap Cues</h2>
+<p>Audio analysis creates a simplified envelope from the first audio
+channel. The envelope powers local waveform rendering and gap cue
+detection.</p>
+<p>The analysis flow is:</p>
+<ol type="1">
+<li>Decode media with Web Audio.</li>
+<li>Build an RMS envelope.</li>
+<li>Store <code>envelope</code> and <code>frameDuration</code>.</li>
+<li>Render waveforms for cues.</li>
+<li>Detect audible gaps between cues and insert generated empty cues
+when appropriate.</li>
+</ol>
+<h3 id="reading-assignment-7">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/AudioAnalyzer.js</code></li>
+<li><code>cuebert/services/AudioAnalyzer.test.js</code></li>
+<li><code>SubtitleEditor.initAudioAnalysis()</code></li>
+<li><code>SubtitleEditor.fillAudibleCueGaps()</code></li>
+</ul>
+<h3 id="lab-7">Lab</h3>
+<p>Explain why gap detection needs both a duration threshold and an
+audio threshold. Then change neither: this is a reading exercise.</p>
+<h3 id="study-questions-7">Study Questions</h3>
+<ol type="1">
+<li>What does one envelope frame represent?</li>
+<li>Why does gap detection sort cues before checking gaps?</li>
+<li>Why should very short audible gaps be ignored?</li>
+</ol>
+<h2 id="autosave-file-adapters-and-tauri">9. Autosave, File Adapters,
+and Tauri</h2>
+<p>Cuebert can run as a browser-like frontend, but desktop functionality
+depends on Tauri. Tauri provides native file paths, filesystem writes,
+matching-media discovery, and logging.</p>
+<p>Autosave is intentionally conservative. It writes VTT back to the
+same file, or writes <code>.cuebert.json</code> next to a source aTrain
+JSON file. The Rust command validates that the autosave target is
+safe.</p>
+<h3 id="reading-assignment-8">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/AutosaveController.js</code></li>
+<li><code>cuebert/services/TauriFileAdapter.js</code></li>
+<li><code>cuebert/services/BrowserFileAdapter.js</code></li>
+<li><code>src-tauri/src/main.rs</code></li>
+<li><code>src-tauri/capabilities/default.json</code></li>
+</ul>
+<h3 id="lab-8">Lab</h3>
+<p>Trace autosave availability:</p>
+<ol type="1">
+<li>The app checks whether a transcript was opened from disk.</li>
+<li><code>AutosaveController</code> computes a target path.</li>
+<li>The frontend calls <code>write_transcript_autosave</code>.</li>
+<li>Rust validates source and target paths before writing.</li>
+</ol>
+<h3 id="study-questions-8">Study Questions</h3>
+<ol type="1">
+<li>Why should autosave target validation happen in Rust, not only
+JavaScript?</li>
+<li>Why does an aTrain JSON source create a sibling
+<code>.cuebert.json</code> target?</li>
+<li>What features are unavailable outside the desktop wrapper?</li>
+</ol>
+<h2 id="search-speakers-and-small-controllers">10. Search, Speakers, and
+Small Controllers</h2>
+<p>Several focused controllers keep common logic outside the main
+element:</p>
+<ul>
+<li><code>CueSearchController</code>: text and speaker search</li>
+<li><code>SpeakerController</code>: manual speakers, cue speaker
+changes, renaming</li>
+<li><code>AutosaveController</code>: autosave paths and
+availability</li>
+<li><code>TranscriptDocument</code>: parsing/export facade</li>
+</ul>
+<p>These classes are deliberately small and easy to unit test.</p>
+<h3 id="reading-assignment-9">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>cuebert/services/CueSearchController.js</code></li>
+<li><code>cuebert/services/CueSearchController.test.js</code></li>
+<li><code>cuebert/services/SpeakerController.js</code></li>
+<li><code>cuebert/services/SpeakerController.test.js</code></li>
+</ul>
+<h3 id="lab-9">Lab</h3>
+<p>Add one new test case to either
+<code>CueSearchController.test.js</code> or
+<code>SpeakerController.test.js</code>, then remove it after verifying
+you understand the pattern.</p>
+<h3 id="study-questions-9">Study Questions</h3>
+<ol type="1">
+<li>What makes these controllers easier to test than
+<code>SubtitleEditor</code>?</li>
+<li>Why should search match both cue text and speaker labels?</li>
+<li>How should speaker renames affect existing cues?</li>
+</ol>
+<h2 id="rendering-virtualization-and-focus">11. Rendering,
+Virtualization, and Focus</h2>
+<p>Cuebert may render hundreds or thousands of cues.
+<code>CueListView</code> virtualizes long lists by rendering only a
+range near the viewport, plus spacer elements. This improves performance
+but makes focus and playback highlighting more complicated.</p>
+<p>When code needs to focus or highlight a cue, it cannot assume the cue
+has a DOM element. It must call <code>ensureCueRendered()</code> or work
+with cue references until the element exists.</p>
+<h3 id="reading-assignment-10">Reading Assignment</h3>
+<p>Read:</p>
+<ul>
+<li><code>CueListView.shouldVirtualize()</code></li>
+<li><code>CueListView.renderVirtualRange()</code></li>
+<li><code>CueListView.ensureCueRendered()</code></li>
+<li><code>SubtitleEditor.syncCueListRenderState()</code></li>
+<li><code>SubtitleEditor.restoreKeyboardCueFocus()</code></li>
+<li><code>SubtitleEditor.setPlaybackCue()</code></li>
+</ul>
+<h3 id="lab-10">Lab</h3>
+<p>Explain how focus should behave after deleting a cue in a virtualized
+list. Include what happens if the next cue was not rendered before
+deletion.</p>
+<h3 id="study-questions-10">Study Questions</h3>
+<ol type="1">
+<li>Why does virtualization require a cue-to-element map?</li>
+<li>Why is cue identity based on object references in several
+places?</li>
+<li>What bugs can appear when focus restoration runs before rendering is
+complete?</li>
+</ol>
+<h2 id="testing-strategy">12. Testing Strategy</h2>
+<p>Most current tests are service-level Deno tests. They are fast and
+useful for pure logic, path decisions, parsing/export behavior, and
+transport state transitions.</p>
+<p>Browser-level or app-level verification is still needed for:</p>
+<ul>
+<li>focus behavior</li>
+<li>DOM events</li>
+<li>waveform pointer interactions</li>
+<li>real media playback behavior</li>
+<li>Tauri file dialogs and native filesystem behavior</li>
+</ul>
+<h3 id="reading-assignment-11">Reading Assignment</h3>
+<p>Read every file matching:</p>
+<div class="sourceCode" id="cb4"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cuebert/services/*.test.js</span></span></code></pre></div>
+<h3 id="lab-11">Lab</h3>
+<p>Pick one recent bug and identify the best level for a regression
+test:</p>
+<ul>
+<li>pure service test</li>
+<li>component DOM test</li>
+<li>browser smoke test</li>
+<li>manual Tauri test</li>
+</ul>
+<h3 id="study-questions-11">Study Questions</h3>
+<ol type="1">
+<li>What should never require launching the desktop app to test?</li>
+<li>What behavior is hard to cover with service tests alone?</li>
+<li>How can a test avoid depending on real media playback?</li>
+</ol>
+<h2 id="change-workflow">13. Change Workflow</h2>
+<p>Use this workflow for most code changes:</p>
+<ol type="1">
+<li>Read the relevant component and service files.</li>
+<li>Identify who owns state and who only emits events.</li>
+<li>Add or update a focused test when the logic is in a service.</li>
+<li>Keep edits narrowly scoped.</li>
+<li>Run <code>deno test cuebert/services/*.test.js</code>.</li>
+<li>For UI behavior, run the app and verify the workflow manually or
+with a browser smoke test.</li>
+</ol>
+<h3 id="common-commands">Common Commands</h3>
+<div class="sourceCode" id="cb5"><pre class="sourceCode sh"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> test cuebert/services/<span class="pp">*</span>.test.js</span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> task dev</span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> task build</span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a><span class="ex">deno</span> task logs</span></code></pre></div>
+<h3 id="study-questions-12">Study Questions</h3>
+<ol type="1">
+<li>Before changing a component, how do you decide whether state belongs
+in the component or <code>SubtitleEditor</code>?</li>
+<li>Before changing a service, what existing tests should you read
+first?</li>
+<li>What should a final verification note include?</li>
+</ol>
+<h2 id="final-project">Final Project</h2>
+<p>Implement a small developer-facing change from start to finish. Good
+examples:</p>
+<ul>
+<li>add a new cue search option</li>
+<li>change the minimum generated gap cue duration</li>
+<li>improve speaker rename behavior</li>
+<li>adjust cue focus behavior after split, merge, or delete</li>
+<li>add a new export edge-case test</li>
+</ul>
+<p>Your final write-up should include:</p>
+<ul>
+<li>the user-visible behavior being changed</li>
+<li>the modules involved</li>
+<li>the state flow before and after the change</li>
+<li>tests added or updated</li>
+<li>manual verification performed</li>
+<li>risks that remain</li>
+</ul>
+<h3 id="final-study-questions">Final Study Questions</h3>
+<ol type="1">
+<li>Which file was the best entry point for your change, and why?</li>
+<li>Which module owned the final state change?</li>
+<li>What event or callback path triggered the behavior?</li>
+<li>What test would fail if your change regressed?</li>
+<li>What part of the app still needs better separation or test
+coverage?</li>
+</ol>
+</body>
+</html>

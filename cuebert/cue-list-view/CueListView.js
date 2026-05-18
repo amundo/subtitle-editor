@@ -8,34 +8,43 @@ class CueListView extends HTMLElement {
     this.cueElementByCue = new Map()
     this.activeCueElement = null
     this.playbackCueElement = null
-    this.renderedRange = { start: 0, end: 0 }
-    this.virtualScrollRaf = null
-    this.estimatedCueBlockHeight = 214
-    this.virtualizationThreshold = 450
-    this.virtualOverscan = 8
-    this.handleViewportChange = () => {
-      if (this.virtualScrollRaf !== null) return
+    this.handleCueEditorFocus = event => {
+      const cueEditor = this.getCueEditorFromEvent(event)
+      if (!cueEditor) return
 
-      this.virtualScrollRaf = requestAnimationFrame(() => {
-        this.virtualScrollRaf = null
-        this.renderVirtualRange()
-      })
+      this.#data.handlers?.onFocusCue?.(cueEditor.data, cueEditor)
+    }
+    this.handleCueEditorClick = event => {
+      const mergeButton = event.target?.closest?.('.cue-merge-button')
+      if (mergeButton && this.contains(mergeButton)) {
+        this.handleMergeCueClick(mergeButton)
+        return
+      }
+
+      const cueEditor = this.getCueEditorFromEvent(event)
+      if (!cueEditor) return
+
+      this.#data.handlers?.onFocusCue?.(cueEditor.data, cueEditor)
+    }
+    this.handleCueEditorChange = event => {
+      const cueEditor = this.getCueEditorFromEvent(event)
+      if (!cueEditor) return
+
+      this.#data.handlers?.onCueChange?.(cueEditor.data, cueEditor)
     }
   }
 
   connectedCallback() {
-    window.addEventListener('scroll', this.handleViewportChange, { passive: true })
-    window.addEventListener('resize', this.handleViewportChange)
+    this.addEventListener('focusin', this.handleCueEditorFocus)
+    this.addEventListener('click', this.handleCueEditorClick)
+    this.addEventListener('cuechange', this.handleCueEditorChange)
     this.render()
   }
 
   disconnectedCallback() {
-    window.removeEventListener('scroll', this.handleViewportChange)
-    window.removeEventListener('resize', this.handleViewportChange)
-    if (this.virtualScrollRaf !== null) {
-      cancelAnimationFrame(this.virtualScrollRaf)
-      this.virtualScrollRaf = null
-    }
+    this.removeEventListener('focusin', this.handleCueEditorFocus)
+    this.removeEventListener('click', this.handleCueEditorClick)
+    this.removeEventListener('cuechange', this.handleCueEditorChange)
   }
 
   set data(data) {
@@ -62,91 +71,32 @@ class CueListView extends HTMLElement {
       handlers = {}
     } = this.#data
 
-    if (this.shouldVirtualize(cues)) {
-      this.renderVirtualRange({ force: true })
-      return
-    }
-
-    this.innerHTML = ''
     this.cueElementByCue = new Map()
     this.activeCueElement = null
     this.playbackCueElement = null
+    const fragment = document.createDocumentFragment()
 
     cues.forEach((cue, index) => {
-      this.appendCueBlock(cues, index)
+      this.appendCueBlock(fragment, cues, index)
     })
+    this.replaceChildren(fragment)
 
     if (activeCue && !this.activeCueElement) {
       this.activeCueElement = this.cueElementByCue.get(activeCue) ?? null
     }
     this.dispatchRenderEvent()
-  }
-
-  shouldVirtualize(cues) {
-    return cues.length > this.virtualizationThreshold
-  }
-
-  renderVirtualRange({ force = false, range: requestedRange = null } = {}) {
-    const { cues = [], activeCue = null } = this.#data
-    if (!this.shouldVirtualize(cues)) return
-
-    const range = requestedRange ?? this.getVirtualRange(cues.length)
-    if (
-      !force &&
-      range.start === this.renderedRange.start &&
-      range.end === this.renderedRange.end
-    ) {
-      return
-    }
-
-    this.renderedRange = range
-    this.innerHTML = ''
-    this.cueElementByCue = new Map()
-    this.activeCueElement = null
-    this.playbackCueElement = null
-
-    const topSpacer = this.createVirtualSpacer(range.start * this.estimatedCueBlockHeight)
-    const bottomSpacer = this.createVirtualSpacer(
-      (cues.length - range.end) * this.estimatedCueBlockHeight
-    )
-
-    this.appendChild(topSpacer)
-    for (let index = range.start; index < range.end; index += 1) {
-      this.appendCueBlock(cues, index)
-    }
-    this.appendChild(bottomSpacer)
-
-    if (activeCue && !this.activeCueElement) {
-      this.activeCueElement = this.cueElementByCue.get(activeCue) ?? null
-    }
-    this.dispatchRenderEvent()
-  }
-
-  getVirtualRange(cueCount) {
-    const rect = this.getBoundingClientRect()
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 800
-    const scrollTop = Math.max(0, -rect.top)
-    const visibleStart = Math.floor(scrollTop / this.estimatedCueBlockHeight)
-    const visibleEnd = Math.ceil((scrollTop + viewportHeight) / this.estimatedCueBlockHeight)
-
-    return {
-      start: Math.max(0, visibleStart - this.virtualOverscan),
-      end: Math.min(cueCount, visibleEnd + this.virtualOverscan)
-    }
-  }
-
-  createVirtualSpacer(height) {
-    const spacer = document.createElement('div')
-    spacer.className = 'cue-list-virtual-spacer'
-    spacer.style.blockSize = `${Math.max(0, height)}px`
-    return spacer
   }
 
   dispatchRenderEvent() {
     this.dispatchEvent(new CustomEvent('cuelistrender', { bubbles: true }))
   }
 
-  appendCueBlock(cues, index) {
+  getCueEditorFromEvent(event) {
+    const cueEditor = event.target?.closest?.('cue-editor')
+    return cueEditor && this.contains(cueEditor) ? cueEditor : null
+  }
+
+  appendCueBlock(parent, cues, index) {
     const {
       allowMerge = true,
       activeCue = null,
@@ -163,7 +113,7 @@ class CueListView extends HTMLElement {
     if (!cue) return
 
     if (allowMerge && index > 0) {
-      this.appendChild(this.createMergeCueRow(cues[index - 1], cue, handlers))
+      parent.appendChild(this.createMergeCueRow(cues[index - 1], cue))
     }
 
     const cueEditor = document.createElement('cue-editor')
@@ -219,37 +169,13 @@ class CueListView extends HTMLElement {
       handlers.onWaveformBoundaryCommit?.(cue, detail, cueEditor)
     }
 
-    cueEditor.addEventListener('focusin', () => {
-      handlers.onFocusCue?.(cue, cueEditor)
-    })
-    cueEditor.addEventListener('click', () => {
-      handlers.onFocusCue?.(cue, cueEditor)
-    })
-    cueEditor.addEventListener('cuechange', () => {
-      handlers.onCueChange?.(cue, cueEditor)
-    })
-
-    this.appendChild(cueEditor)
+    parent.appendChild(cueEditor)
   }
 
   ensureCueRendered(cue, { scroll = false } = {}) {
     const { cues = [] } = this.#data
     const index = cues.indexOf(cue)
     if (index === -1) return null
-
-    if (this.shouldVirtualize(cues)) {
-      const rangeContainsCue = (
-        index >= this.renderedRange.start &&
-        index < this.renderedRange.end
-      )
-      if (!rangeContainsCue || !this.cueElementByCue.has(cue)) {
-        const range = {
-          start: Math.max(0, index - this.virtualOverscan),
-          end: Math.min(cues.length, index + this.virtualOverscan + 1)
-        }
-        this.renderVirtualRange({ force: true, range })
-      }
-    }
 
     const cueEditor = this.cueElementByCue.get(cue) ?? null
     if (scroll && cueEditor) {
@@ -259,21 +185,31 @@ class CueListView extends HTMLElement {
     return cueEditor
   }
 
-  createMergeCueRow(previousCue, nextCue, handlers) {
+  createMergeCueRow(previousCue, nextCue) {
     const row = document.createElement('div')
     row.className = 'cue-merge-row'
 
     const button = document.createElement('button')
     button.type = 'button'
     button.className = 'cue-merge-button'
+    button.dataset.previousCueIndex = String(this.#data.cues.indexOf(previousCue))
+    button.dataset.nextCueIndex = String(this.#data.cues.indexOf(nextCue))
     button.textContent = '▲ merge ▼'
     button.title = 'Merge the cue above with the cue below'
-    button.addEventListener('click', () => {
-      handlers.onMergeCues?.(previousCue, nextCue)
-    })
 
     row.appendChild(button)
     return row
+  }
+
+  handleMergeCueClick(button) {
+    const { cues = [], handlers = {} } = this.#data
+    const previousIndex = Number(button.dataset.previousCueIndex)
+    const nextIndex = Number(button.dataset.nextCueIndex)
+    const previousCue = cues[previousIndex]
+    const nextCue = cues[nextIndex]
+    if (!previousCue || !nextCue) return
+
+    handlers.onMergeCues?.(previousCue, nextCue)
   }
 }
 
