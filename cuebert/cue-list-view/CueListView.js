@@ -6,6 +6,7 @@ class CueListView extends HTMLElement {
   constructor() {
     super()
     this.cueElementByCue = new Map()
+    this.cueElementById = new Map()
     this.activeCueElement = null
     this.playbackCueElement = null
     this.handleCueEditorFocus = event => {
@@ -48,7 +49,13 @@ class CueListView extends HTMLElement {
   }
 
   set data(data) {
+    const previousData = this.#data
     this.#data = data ?? {}
+    if (this.canPatchCueRows(previousData, this.#data)) {
+      this.patchCueRows(previousData)
+      return
+    }
+
     this.render()
   }
 
@@ -72,6 +79,7 @@ class CueListView extends HTMLElement {
     } = this.#data
 
     this.cueElementByCue = new Map()
+    this.cueElementById = new Map()
     this.activeCueElement = null
     this.playbackCueElement = null
     const fragment = document.createDocumentFragment()
@@ -87,6 +95,49 @@ class CueListView extends HTMLElement {
     this.dispatchRenderEvent()
   }
 
+  canPatchCueRows(previousData = {}, nextData = {}) {
+    const previousCues = previousData.cues ?? []
+    const nextCues = nextData.cues ?? []
+    if (!previousCues.length || previousCues.length !== nextCues.length) return false
+    if (previousData.allowMerge !== nextData.allowMerge) return false
+
+    return nextCues.every((cue, index) => {
+      const cueId = this.getCueId(cue)
+      return (
+        cueId !== undefined &&
+        cueId !== null &&
+        cueId === this.getCueId(previousCues[index]) &&
+        this.cueElementById.has(cueId)
+      )
+    })
+  }
+
+  patchCueRows(previousData = {}) {
+    const { cues = [], activeCue = null, playbackCue = null } = this.#data
+    const previousCues = previousData.cues ?? []
+
+    this.cueElementByCue = new Map()
+    this.activeCueElement = null
+    this.playbackCueElement = null
+
+    cues.forEach((cue, index) => {
+      const cueEditor = this.cueElementById.get(this.getCueId(cue))
+      if (!cueEditor) return
+
+      this.updateCueEditorSharedProps(cueEditor)
+      if (cue !== previousCues[index]) {
+        this.configureCueEditor(cueEditor, cue)
+      }
+      this.cueElementByCue.set(cue, cueEditor)
+
+      cueEditor.classList.toggle('is-playback-active', this.isSameCue(playbackCue, cue))
+      if (this.isSameCue(activeCue, cue)) this.activeCueElement = cueEditor
+      if (this.isSameCue(playbackCue, cue)) this.playbackCueElement = cueEditor
+    })
+
+    this.dispatchRenderEvent()
+  }
+
   dispatchRenderEvent() {
     this.dispatchEvent(new CustomEvent('cuelistrender', { bubbles: true }))
   }
@@ -97,18 +148,7 @@ class CueListView extends HTMLElement {
   }
 
   appendCueBlock(parent, cues, index) {
-    const {
-      allowMerge = true,
-      activeCue = null,
-      video = null,
-      playbackCue = null,
-      speakers = [],
-      envelope = null,
-      frameDuration = null,
-      playheadTime = null,
-      formatTime = seconds => seconds.toFixed(3),
-      handlers = {}
-    } = this.#data
+    const { allowMerge = true, activeCue = null, playbackCue = null } = this.#data
     const cue = cues[index]
     if (!cue) return
 
@@ -117,25 +157,30 @@ class CueListView extends HTMLElement {
     }
 
     const cueEditor = document.createElement('cue-editor')
-    cueEditor.video = video
-    cueEditor.formatTime = formatTime
-    cueEditor.speakerOptions = speakers
-    cueEditor.envelope = envelope
-    cueEditor.frameDuration = frameDuration
-    cueEditor.playheadTime = playheadTime
-    cueEditor.contextWindow = 0.75
-    cueEditor.data = cue
+    this.configureCueEditor(cueEditor, cue)
 
     this.cueElementByCue.set(cue, cueEditor)
+    if (this.getCueId(cue) !== undefined && this.getCueId(cue) !== null) {
+      this.cueElementById.set(this.getCueId(cue), cueEditor)
+    }
 
-    if (activeCue === cue) {
+    if (this.isSameCue(activeCue, cue)) {
       this.activeCueElement = cueEditor
     }
 
-    if (playbackCue === cue) {
+    if (this.isSameCue(playbackCue, cue)) {
       cueEditor.classList.add('is-playback-active')
       this.playbackCueElement = cueEditor
     }
+
+    parent.appendChild(cueEditor)
+  }
+
+  configureCueEditor(cueEditor, cue) {
+    const { handlers = {} } = this.#data
+
+    this.updateCueEditorSharedProps(cueEditor)
+    cueEditor.data = cue
 
     cueEditor.onPlayCue = selectedCue => {
       handlers.onPlayCue?.(selectedCue, cueEditor)
@@ -168,16 +213,45 @@ class CueListView extends HTMLElement {
     cueEditor.onWaveformBoundaryCommit = detail => {
       handlers.onWaveformBoundaryCommit?.(cue, detail, cueEditor)
     }
+  }
 
-    parent.appendChild(cueEditor)
+  updateCueEditorSharedProps(cueEditor) {
+    const {
+      video = null,
+      speakers = [],
+      envelope = null,
+      frameDuration = null,
+      playheadTime = null,
+      formatTime = seconds => seconds.toFixed(3)
+    } = this.#data
+
+    const waveformInputsChanged = (
+      cueEditor.envelope !== envelope ||
+      cueEditor.frameDuration !== frameDuration
+    )
+
+    cueEditor.video = video
+    cueEditor.formatTime = formatTime
+    cueEditor.speakerOptions = speakers
+    cueEditor.envelope = envelope
+    cueEditor.frameDuration = frameDuration
+    cueEditor.playheadTime = playheadTime
+    cueEditor.contextWindow = 0.75
+
+    if (waveformInputsChanged) {
+      cueEditor.renderWaveform?.()
+    }
   }
 
   ensureCueRendered(cue, { scroll = false } = {}) {
     const { cues = [] } = this.#data
-    const index = cues.indexOf(cue)
+    const cueId = this.getCueId(cue)
+    const index = cues.findIndex(candidate => this.isSameCue(candidate, cue))
     if (index === -1) return null
 
-    const cueEditor = this.cueElementByCue.get(cue) ?? null
+    const cueEditor = this.cueElementByCue.get(cues[index]) ??
+      this.cueElementById.get(cueId) ??
+      null
     if (scroll && cueEditor) {
       cueEditor.scrollIntoView({ block: 'center', behavior: 'smooth' })
     }
@@ -210,6 +284,18 @@ class CueListView extends HTMLElement {
     if (!previousCue || !nextCue) return
 
     handlers.onMergeCues?.(previousCue, nextCue)
+  }
+
+  getCueId(cue) {
+    return cue?.id
+  }
+
+  isSameCue(firstCue, secondCue) {
+    if (!firstCue || !secondCue) return firstCue === secondCue
+    const firstId = this.getCueId(firstCue)
+    const secondId = this.getCueId(secondCue)
+    if (firstId === undefined || firstId === null) return firstCue === secondCue
+    return firstId === secondId
   }
 }
 

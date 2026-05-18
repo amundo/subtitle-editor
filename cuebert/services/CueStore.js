@@ -19,6 +19,10 @@ class CueStore extends EventTarget {
     return this.cues.length
   }
 
+  getCueCount() {
+    return this.cues.length
+  }
+
   setCues(cues = []) {
     const previousCues = this.cues
     this.cues = Array.from(cues)
@@ -51,6 +55,21 @@ class CueStore extends EventTarget {
 
   indexOfId(id) {
     return this.indexById.get(id) ?? -1
+  }
+
+  getCueAtIndex(index) {
+    return this.getByIndex(index)
+  }
+
+  getCueIndex(cueId) {
+    return this.indexOfId(cueId)
+  }
+
+  getCueRange(startIndex = 0, endIndex = this.cues.length) {
+    return this.cues.slice(
+      this.clampIndex(startIndex),
+      this.clampIndex(endIndex)
+    )
   }
 
   update(id, patchOrUpdater = {}) {
@@ -180,6 +199,31 @@ class CueStore extends EventTarget {
     })
   }
 
+  getSearchMatchedCueCount(query, options = {}) {
+    return this.getSearchMatchedCues(query, options).length
+  }
+
+  getSearchMatchedCues(query, options = {}) {
+    return this.search(query, options)
+  }
+
+  getSearchMatchedCueAtIndex(index, query, options = {}) {
+    return this.getSearchMatchedCues(query, options)[index] ?? null
+  }
+
+  getSearchMatchedCueIndex(cueId, query, options = {}) {
+    return this.getSearchMatchedCues(query, options)
+      .findIndex(cue => cue?.id === cueId)
+  }
+
+  getSearchMatchedCueRange(startIndex = 0, endIndex = this.cues.length, query, options = {}) {
+    const matchedCues = this.getSearchMatchedCues(query, options)
+    return matchedCues.slice(
+      this.clampRangeIndex(startIndex, matchedCues.length),
+      this.clampRangeIndex(endIndex, matchedCues.length)
+    )
+  }
+
   filter(predicate) {
     return this.cues.filter(predicate)
   }
@@ -196,6 +240,11 @@ class CueStore extends EventTarget {
   clampIndex(index) {
     if (!Number.isInteger(index)) return this.cues.length
     return Math.min(this.cues.length, Math.max(0, index))
+  }
+
+  clampRangeIndex(index, length) {
+    if (!Number.isInteger(index)) return length
+    return Math.min(length, Math.max(0, index))
   }
 
   getChangedKeys(previousCue, cue) {

@@ -2,11 +2,17 @@
 
 /* cue-editor/cue-editor.css */
 cue-editor {
+  --cue-editor-block-size: 15.5rem;
+
+  box-sizing: border-box;
+  block-size: var(--cue-editor-block-size);
   padding: 0.75rem 1rem 1rem;
   margin-bottom: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #fff;
   display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  overflow: hidden;
 
   textarea {
     font-family: "Courier New", ui-monospace, monospace;
@@ -19,6 +25,7 @@ cue-editor {
     align-items: center;
     gap: 0.5rem;
     margin-bottom: 0.45rem;
+    min-height: 1.65rem;
   }
 
   .cue-meta-spacer {
@@ -76,6 +83,7 @@ cue-editor {
     margin-bottom: 0.5rem;
     font-family: "Courier New", ui-monospace, monospace;
     font-size: 0.9rem;
+    min-height: 1.65rem;
   }
 
   .time-button {
@@ -103,9 +111,12 @@ cue-editor {
   }
 
   .cue-text {
+    box-sizing: border-box;
     width: 100%;
-    min-height: 5rem;
-    resize: vertical;
+    min-height: 0;
+    height: 100%;
+    resize: none;
+    overflow: auto;
     padding: 0.5rem;
     border-radius: 2px;
     border: 1px solid #222;

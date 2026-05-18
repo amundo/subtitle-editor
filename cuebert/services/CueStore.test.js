@@ -13,15 +13,32 @@ function assert(condition, message = 'Expected condition to be true') {
 }
 
 Deno.test('CueStore reads cues by id and index', () => {
-  const firstCue = { id: 1, start: 0, end: 1, text: 'first' }
+  const firstCue =  { id: 1, start: 0, end: 1, text: 'first' }
   const secondCue = { id: 2, start: 1, end: 2, text: 'second' }
   const store = new CueStore([firstCue, secondCue])
 
   assertEquals(store.length, 2)
+  assertEquals(store.getCueCount(), 2)
   assertEquals(store.getById(2), secondCue)
   assertEquals(store.getByIndex(0), firstCue)
-  assertEquals(store.indexOfId(1), 0)
+  assertEquals(store.getCueAtIndex(0), firstCue)
+  assertEquals(store.indexOfId(1),   0)
+  assertEquals(store.getCueIndex(1), 0)
   assertEquals(store.getById(3), null)
+})
+
+Deno.test('CueStore returns clamped cue ranges', () => {
+  const cues = [
+    { id: 1, start: 0, end: 1, text: 'first' },
+    { id: 2, start: 1, end: 2, text: 'second' },
+    { id: 3, start: 2, end: 3, text: 'third' },
+    { id: 4, start: 3, end: 4, text: 'fourth' }
+  ]
+  const store = new CueStore(cues)
+
+  assertEquals(store.getCueRange(1, 3),   [cues[1], cues[2]])
+  assertEquals(store.getCueRange(-10, 2), [cues[0], cues[1]])
+  assertEquals(store.getCueRange(2, 99),  [cues[2], cues[3]])
 })
 
 Deno.test('CueStore toArray returns a snapshot of the cue list', () => {
@@ -158,6 +175,26 @@ Deno.test('CueStore searches and filters cues', () => {
   assertEquals(store.search('host').map(cue => cue.id), [1])
   assertEquals(store.search('line', { wholeWords: true }).map(cue => cue.id), [1])
   assertEquals(store.filter(cue => cue.end > 1).map(cue => cue.id), [2])
+})
+
+Deno.test('CueStore returns search-filtered selector results', () => {
+  const cues = [
+    { id: 1, start: 0, end: 1, text: 'Opening line', speaker: 'Host' },
+    { id: 2, start: 1, end: 2, text: 'closing line', speaker: 'Guest' },
+    { id: 3, start: 2, end: 3, text: 'another topic', speaker: 'Guest' },
+    { id: 4, start: 3, end: 4, text: 'final line', speaker: 'Host' }
+  ]
+  const store = new CueStore(cues)
+
+  assertEquals(store.getSearchMatchedCueCount('line'), 3)
+  assertEquals(store.getSearchMatchedCueAtIndex(1, 'line'), cues[1])
+  assertEquals(store.getSearchMatchedCueIndex(4, 'line'), 2)
+  assertEquals(store.getSearchMatchedCueIndex(3, 'line'), -1)
+  assertEquals(store.getSearchMatchedCueRange(1, 3, 'line'), [cues[1], cues[3]])
+  assertEquals(
+    store.getSearchMatchedCueRange(0, 99, 'Guest', { matchCase: true }),
+    [cues[1], cues[2]]
+  )
 })
 
 Deno.test('CueStore supports onChange as a convenience wrapper', () => {
