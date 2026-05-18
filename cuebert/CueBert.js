@@ -8,11 +8,7 @@ import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { TransportController } from './services/TransportController.js'
 import { CueSearchController } from './services/CueSearchController.js'
-import {
-  deleteCue as deleteCueOperation,
-  mergeCues as mergeCuesOperation,
-  splitCue as splitCueOperation
-} from './services/CueOperations.js'
+import { CueStore } from './services/CueStore.js'
 
 class CueBert extends HTMLElement {
   constructor() {
@@ -21,7 +17,6 @@ class CueBert extends HTMLElement {
     this.isInitialized = false
 
     // transcript/document state
-    this.cues = []
     this.manualSpeakers = []
     this.loadedTranscript = null
     this.loadedTranscriptFormat = null
@@ -59,6 +54,9 @@ class CueBert extends HTMLElement {
     this.speakerController = new SpeakerController()
     this.transcriptDocument = new TranscriptDocument()
     this.cueSearchController = new CueSearchController()
+    this.cueStore = new CueStore([], {
+      searchController: this.cueSearchController
+    })
 
     // audio analysis state
     this.audioBuffer = null
@@ -77,6 +75,14 @@ class CueBert extends HTMLElement {
     this.transportPlaybackHighlightActive = false
     this.globalPlaybackKeydownHandler = null
     this.keyboardFocusedCue = null
+  }
+
+  get cues() {
+    return this.cueStore?.toArray() ?? []
+  }
+
+  set cues(cues) {
+    this.cueStore?.setCues(cues)
   }
 
   connectedCallback() {
@@ -1601,21 +1607,38 @@ class CueBert extends HTMLElement {
 
   createCueId(baseId, suffix) {
     const nextId = `${baseId ?? this.cues.length + 1}-${suffix}`
-    return this.cues.some(cue => String(cue.id) === nextId)
+    return this.cueStore.indexOfId(nextId) !== -1
       ? `${nextId}-${Date.now()}`
       : nextId
   }
 
   splitCue(cue, selection = {}) {
     const cueIndex = this.cues.indexOf(cue)
-    splitCueOperation.call(this, cue, selection)
+    const [beforeText, afterText] = this.splitCueText(
+      cue.text || '',
+      selection.selectionStart
+    )
+    const result = this.cueStore.split(cue.id, {
+      splitTime: this.getCueSplitTime(cue),
+      beforeText,
+      afterText,
+      createCueId: (baseId, suffix) => this.createCueId(baseId, suffix)
+    })
+    if (!result) return
+
+    this.afterCueChange()
     if (cueIndex !== -1 && this.cues.includes(cue)) {
       this.focusCueText(cue, { scroll: false })
     }
   }
 
   mergeCues(targetCue, mergedCue) {
-    mergeCuesOperation.call(this, targetCue, mergedCue)
+    const result = this.cueStore.merge(targetCue.id, mergedCue.id, {
+      joinCueText: (firstText, secondText) => this.joinCueText(firstText, secondText)
+    })
+    if (!result) return
+
+    this.afterCueChange()
   }
 
   deleteCue(cue) {
@@ -1630,7 +1653,15 @@ class CueBert extends HTMLElement {
       focusedCueEditor?.data === cue
     )
 
-    deleteCueOperation.call(this, cue)
+    const removedCue = this.cueStore.remove(cue.id)
+    if (!removedCue) return
+
+    if (this.activeCue === cue) {
+      this.activeCue = nextFocusCue
+      this.activeCueElement = null
+    }
+
+    this.afterCueChange({ speakersChanged: false })
     if (shouldRestoreFocus && nextFocusCue && this.cues.includes(nextFocusCue)) {
       this.activeCue = nextFocusCue
       this.keyboardFocusedCue = nextFocusCue
