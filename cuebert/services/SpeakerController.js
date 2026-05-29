@@ -70,6 +70,29 @@ class SpeakerController {
     return true
   }
 
+  setDefaultSpeakerForUnlabeledCues({ cues = [], speaker }) {
+    const nextSpeaker = this.normalizeSpeaker(speaker)
+    if (!nextSpeaker) {
+      return {
+        changed: false,
+        changedCount: 0
+      }
+    }
+
+    let changedCount = 0
+    cues.forEach(cue => {
+      if (!cue || this.normalizeSpeaker(cue.speaker)) return
+
+      cue.speaker = nextSpeaker
+      changedCount++
+    })
+
+    return {
+      changed: changedCount > 0,
+      changedCount
+    }
+  }
+
   normalizeSpeaker(speaker) {
     return typeof speaker === 'string' ? speaker.trim() : ''
   }

@@ -6,8 +6,14 @@ use std::{
     path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
+use tauri::{
+    menu::{Menu, MenuItem, HELP_SUBMENU_ID},
+    Manager, WebviewUrl, WebviewWindowBuilder,
+};
 
 const LOG_FILE_NAME: &str = "cuebert.log";
+const TRANSCRIPTION_SETUP_GUIDE_MENU_ID: &str = "transcription_setup_guide";
+const TRANSCRIPTION_SETUP_GUIDE_WINDOW_LABEL: &str = "transcription-setup-guide";
 
 fn fallback_log_dir() -> PathBuf {
     if cfg!(target_os = "macos") {
@@ -147,6 +153,59 @@ fn write_transcript_autosave(
         .map_err(|error| format!("failed to write {}: {error}", target_path.display()))
 }
 
+fn install_app_menu(app: &tauri::App) -> tauri::Result<()> {
+    let menu = Menu::default(app.handle())?;
+    let setup_guide_item = MenuItem::with_id(
+        app.handle(),
+        TRANSCRIPTION_SETUP_GUIDE_MENU_ID,
+        "Transcription Setup Guide",
+        true,
+        None::<&str>,
+    )?;
+
+    if let Some(item) = menu.get(HELP_SUBMENU_ID) {
+        if let Some(help_menu) = item.as_submenu() {
+            help_menu.append(&setup_guide_item)?;
+        }
+    }
+
+    app.set_menu(menu)?;
+    Ok(())
+}
+
+fn open_transcription_setup_guide(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(TRANSCRIPTION_SETUP_GUIDE_WINDOW_LABEL) {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+
+    let result = WebviewWindowBuilder::new(
+        &app,
+        TRANSCRIPTION_SETUP_GUIDE_WINDOW_LABEL,
+        WebviewUrl::App("help/transcription-setup.html".into()),
+    )
+    .title("Transcription Setup Guide")
+    .inner_size(900.0, 760.0)
+    .min_inner_size(640.0, 520.0)
+    .resizable(true)
+    .build();
+
+    if let Err(error) = result {
+        let line = serde_json::json!({
+          "timestamp_ms": now_millis(),
+          "entry": {
+            "level": "error",
+            "source": "rust",
+            "message": "failed to open transcription setup guide",
+            "error": error.to_string(),
+          },
+        });
+
+        let _ = append_log_line(fallback_log_dir(), &line.to_string());
+    }
+}
+
 fn main() {
     std::panic::set_hook(Box::new(|panic_info| {
         let location = panic_info
@@ -178,6 +237,18 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .setup(|app| {
+            install_app_menu(app)?;
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id() == TRANSCRIPTION_SETUP_GUIDE_MENU_ID {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    open_transcription_setup_guide(app);
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             append_log,
             find_matching_media,

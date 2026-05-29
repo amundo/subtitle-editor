@@ -80,6 +80,16 @@
       "command": "deno run --allow-read --allow-write scripts/bump-version.js"
     },
 
+    "transcribe": {
+      "description": "Run whisper.cpp and create Cuebert-loadable JSON",
+      "command": "deno run --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL scripts/cuebert-transcribe.js"
+    },
+
+    "transcribe:compile": {
+      "description": "Build the Cuebert whisper.cpp preprocessor as a local binary",
+      "command": "deno compile --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL --output cuebert-transcribe scripts/cuebert-transcribe.js"
+    },
+
     "logs": {
       "description": "Show last 200 lines of app log file",
       "command": "tail -n 200 ~/Library/Logs/Cuebert/cuebert.log"

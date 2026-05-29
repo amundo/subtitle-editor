@@ -380,7 +380,7 @@ cue-bert {
 
   .speaker-row {
     display: grid;
-    grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(7rem, auto) minmax(0, 1fr) auto auto;
     gap: 0.5rem;
     align-items: center;
   }
@@ -406,6 +406,19 @@ cue-bert {
     padding: 0.4rem 0.7rem;
     border-radius: 999px;
     cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .speaker-apply:disabled {
+    color: #8c959f;
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .speaker-default {
+    border-color: #80b9bd;
+    background: #eef8f8;
+    color: #0b3a67;
   }
 
   .speaker-dialog-actions {

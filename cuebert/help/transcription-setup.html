@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Transcription Setup Guide</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c2430;
+      --muted: #5b6573;
+      --line: #d8dee8;
+      --panel: #f6f8fb;
+      --accent: #0b6f68;
+      --code-bg: #17202b;
+      --code-ink: #f3f7fb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(820px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 34px 0 12px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 1.25rem;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ol,
+    ul {
+      margin: 0 0 18px;
+      padding-left: 1.45rem;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      margin: 10px 0 18px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      border-radius: 8px;
+      color: var(--code-ink);
+      background: var(--code-bg);
+    }
+
+    pre code {
+      font-size: 0.9rem;
+      white-space: pre;
+    }
+
+    .intro {
+      color: var(--muted);
+      font-size: 1.02rem;
+    }
+
+    .note {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Transcription Setup Guide</h1>
+    <p class="intro">
+      Use the prepared Cuebert transcription kit to make a first-draft
+      transcript, then open the JSON file in Cuebert for correction.
+    </p>
+
+    <h2>What You Need</h2>
+    <ol>
+      <li>The Cuebert transcription kit folder.</li>
+      <li>The audio or video file you want to transcribe.</li>
+      <li>Cuebert for reviewing and correcting the transcript.</li>
+    </ol>
+
+    <div class="note">
+      No Homebrew, Deno, Git, Xcode, or whisper.cpp setup is needed if the kit
+      has already been prepared.
+    </div>
+
+    <h2>Check the Kit</h2>
+    <p>
+      Open Terminal and run:
+    </p>
+    <pre><code>cuebert-transcribe --setup-check</code></pre>
+
+    <p>
+      If the kit is ready, it will show the whisper.cpp program and model it
+      found.
+    </p>
+
+    <h2>Transcribe One File</h2>
+    <p>
+      Put the media file somewhere easy to find, such as the Desktop. Then run:
+    </p>
+    <pre><code>cuebert-transcribe ~/Desktop/interview.mp3</code></pre>
+
+    <p>
+      This writes:
+    </p>
+    <pre><code>~/Desktop/interview.json</code></pre>
+
+    <h2>Open It in Cuebert</h2>
+    <ol>
+      <li>Open Cuebert.</li>
+      <li>Choose <strong>Load transcript</strong>.</li>
+      <li>Select the JSON file, such as <code>interview.json</code>.</li>
+    </ol>
+
+    <p>
+      If the media file is next to the JSON file, Cuebert should automatically
+      load the audio or video too.
+    </p>
+
+    <h2>Send Files to an Editor</h2>
+    <p>
+      Send both files:
+    </p>
+    <pre><code>interview.json
+interview.mp3</code></pre>
+
+    <p>
+      After someone starts editing in Cuebert, they may save a
+      <code>interview.cuebert.json</code> file and use that from then on.
+    </p>
+
+    <h2>Useful Commands</h2>
+    <h3>Spanish audio</h3>
+    <pre><code>cuebert-transcribe --language es ~/Desktop/interview.mp3</code></pre>
+
+    <h3>Replace an existing transcript</h3>
+    <pre><code>cuebert-transcribe --overwrite ~/Desktop/interview.mp3</code></pre>
+
+    <h3>Several files</h3>
+    <pre><code>cuebert-transcribe ~/Desktop/one.mp3 ~/Desktop/two.mp3</code></pre>
+
+    <h2>Prepared Kit Layout</h2>
+    <p>
+      The kit folder should look like this on macOS:
+    </p>
+    <pre><code>cuebert-transcription-kit/
+  cuebert-transcribe
+  whisper-cli
+  models/
+    ggml-large-v3.bin</code></pre>
+
+    <p>
+      On Windows, the executable names are <code>cuebert-transcribe.exe</code>
+      and <code>whisper-cli.exe</code>.
+    </p>
+  </main>
+</body>
+</html>

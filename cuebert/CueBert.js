@@ -270,7 +270,7 @@ class CueBert extends HTMLElement {
           <div class="speaker-panel">
             <div class="speaker-panel-header">
               <strong>Speakers</strong>
-              <span class="speaker-panel-hint">Rename a speaker once to update every cue.</span>
+              <span class="speaker-panel-hint">Rename a speaker once, or make one the default for unlabeled cues.</span>
             </div>
             <form data-role="addSpeakerForm" class="speaker-add-row">
               <input
@@ -1684,17 +1684,35 @@ class CueBert extends HTMLElement {
       cues: this.cues,
       speaker
     })
+    if (!result.changed) return
+
     this.manualSpeakers = result.manualSpeakers
 
     if (this.addSpeakerInput) this.addSpeakerInput.value = ''
     this.renderSpeakerEditor()
     this.renderCues()
+    this.markDirty()
+  }
+
+  setDefaultSpeaker(speaker) {
+    const result = this.speakerController.setDefaultSpeakerForUnlabeledCues({
+      cues: this.cues,
+      speaker
+    })
+    if (!result.changed) return
+
+    this.afterCueChange()
+  }
+
+  getUnlabeledCueCount() {
+    return this.cues.filter(cue => !this.speakerController.normalizeSpeaker(cue?.speaker)).length
   }
 
   renderSpeakerEditor() {
     if (!this.editSpeakersBtn || !this.speakerList) return
 
     const speakers = this.getUniqueSpeakers()
+    const unlabeledCueCount = this.getUnlabeledCueCount()
     this.editSpeakersBtn.hidden = this.cues.length === 0
     if (!speakers.length) {
       this.speakerList.innerHTML = ''
@@ -1721,11 +1739,24 @@ class CueBert extends HTMLElement {
       button.className = 'speaker-apply'
       button.textContent = 'Apply'
 
-      row.append(source, input, button)
+      const defaultButton = document.createElement('button')
+      defaultButton.type = 'button'
+      defaultButton.className = 'speaker-apply speaker-default'
+      defaultButton.textContent = 'Make default'
+      defaultButton.disabled = unlabeledCueCount === 0
+      defaultButton.title = unlabeledCueCount
+        ? `Set ${unlabeledCueCount} unlabeled cue${unlabeledCueCount === 1 ? '' : 's'} to ${speaker}`
+        : 'No unlabeled cues'
+
+      row.append(source, input, button, defaultButton)
 
       row.addEventListener('submit', e => {
         e.preventDefault()
         this.renameSpeaker(speaker, input?.value ?? '')
+      })
+
+      defaultButton.addEventListener('click', () => {
+        this.setDefaultSpeaker(speaker)
       })
 
       this.speakerList.appendChild(row)

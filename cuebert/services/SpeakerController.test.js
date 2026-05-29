@@ -92,3 +92,44 @@ Deno.test('SpeakerController sets and clears cue speaker', () => {
 
   assertEquals(controller.setCueSpeaker(cue, ' '), false)
 })
+
+Deno.test('SpeakerController sets a default speaker for unlabeled cues', () => {
+  const controller = new SpeakerController()
+  const cues = [
+    { speaker: null },
+    { speaker: '' },
+    { speaker: 'Host' },
+    { speaker: '   ' },
+    {}
+  ]
+
+  assertEquals(
+    controller.setDefaultSpeakerForUnlabeledCues({
+      cues,
+      speaker: ' Guest '
+    }),
+    {
+      changed: true,
+      changedCount: 4
+    }
+  )
+
+  assertEquals(cues, [
+    { speaker: 'Guest' },
+    { speaker: 'Guest' },
+    { speaker: 'Host' },
+    { speaker: 'Guest' },
+    { speaker: 'Guest' }
+  ])
+
+  assertEquals(
+    controller.setDefaultSpeakerForUnlabeledCues({
+      cues,
+      speaker: 'Guest'
+    }),
+    {
+      changed: false,
+      changedCount: 0
+    }
+  )
+})

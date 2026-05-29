@@ -127,6 +127,8 @@ class CueListView extends HTMLElement {
       this.updateCueEditorSharedProps(cueEditor)
       if (cue !== previousCues[index]) {
         this.configureCueEditor(cueEditor, cue)
+      } else {
+        cueEditor.updateSpeakerPill?.()
       }
       this.cueElementByCue.set(cue, cueEditor)
 

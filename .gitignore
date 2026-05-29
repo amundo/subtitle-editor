@@ -8,3 +8,10 @@ sample-atrain-output/transcription.srt
 sample-atrain-output/transcription.txt
 sample-atrain-output/transcription.vtt
 cuebert-ai-context.zip
+cuebert-transcribe
+cuebert-transcribe.exe
+2026_04_17_EddyEntrevista.cuebert.json
+2026_04_17_EddyEntrevista.cuebert.sample.json
+2026_04_17_EddyEntrevista.wav.json
+2026_04_17_EddyEntrevista.wav.sample.json
+cuebert-transcription-kit/models/*.bin
