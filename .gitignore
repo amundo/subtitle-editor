@@ -14,4 +14,7 @@ cuebert-transcribe.exe
 2026_04_17_EddyEntrevista.cuebert.sample.json
 2026_04_17_EddyEntrevista.wav.json
 2026_04_17_EddyEntrevista.wav.sample.json
+
+# Local transcription binaries/models
 cuebert-transcription-kit/models/*.bin
+cuebert-transcription-kit/whisper-cli
