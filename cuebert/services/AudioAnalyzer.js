@@ -1,38 +1,17 @@
 const DEFAULT_WINDOW_SIZE = 2048;
-const DEFAULT_SAMPLE_STRIDE = 8;
 const DEFAULT_MIN_GAP_DURATION = 0.5;
 const DEFAULT_ABSOLUTE_SOUND_THRESHOLD = 0.01;
 const DEFAULT_RELATIVE_SOUND_THRESHOLD = 0.08;
 
-function buildEnvelope(
-  audioBuffer,
-  {
-    windowSize = DEFAULT_WINDOW_SIZE,
-    sampleStride = DEFAULT_SAMPLE_STRIDE,
-  } = {},
-) {
+function buildEnvelope(audioBuffer, { windowSize = DEFAULT_WINDOW_SIZE } = {}) {
   const channelData = audioBuffer.getChannelData(0);
-  return buildEnvelopeFromChannelData(channelData, audioBuffer.sampleRate, {
-    windowSize,
-    sampleStride,
-  });
-}
-
-function buildEnvelopeFromChannelData(
-  channelData,
-  sampleRate,
-  {
-    windowSize = DEFAULT_WINDOW_SIZE,
-    sampleStride = DEFAULT_SAMPLE_STRIDE,
-  } = {},
-) {
-  const stride = Math.max(1, Math.floor(sampleStride));
+  const sampleRate = audioBuffer.sampleRate;
 
   const envelope = [];
   for (let i = 0; i < channelData.length; i += windowSize) {
     let sum = 0;
     let count = 0;
-    for (let j = i; j < i + windowSize && j < channelData.length; j += stride) {
+    for (let j = i; j < i + windowSize && j < channelData.length; j++) {
       const v = channelData[j];
       sum += v * v;
       count++;
@@ -136,10 +115,4 @@ function getAudibleCueGaps(
   return gaps;
 }
 
-export {
-  buildEnvelope,
-  buildEnvelopeFromChannelData,
-  getAudibleCueGaps,
-  getSoundThreshold,
-  hasSoundInRange,
-};
+export { buildEnvelope, getAudibleCueGaps, getSoundThreshold, hasSoundInRange };

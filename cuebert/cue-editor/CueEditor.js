@@ -27,7 +27,7 @@ class CueEditor extends HTMLElement {
   }
 
   connectedCallback() {
-    if (!this.waveForm) this.render()
+    this.render()
   }
 
   set data(cue) {
@@ -224,7 +224,6 @@ class CueEditor extends HTMLElement {
       !event.ctrlKey
     ) {
       event.preventDefault()
-      event.stopImmediatePropagation?.()
       event.stopPropagation()
       this.onNavigateCue?.(event.key === 'ArrowDown' ? 1 : -1)
     }
@@ -261,7 +260,7 @@ class CueEditor extends HTMLElement {
     }
   }
 
-  renderWaveform({ force = false } = {}) {
+  renderWaveform() {
     if (!this.waveForm || !this.#data) return
 
     this.waveForm.data = {
@@ -270,8 +269,7 @@ class CueEditor extends HTMLElement {
       start: this.#data.start,
       end: this.#data.end,
       playheadTime: this.playheadTime,
-      contextWindow: this.contextWindow,
-      lazy: !force
+      contextWindow: this.contextWindow
     }
   }
 

@@ -9,7 +9,6 @@ class CueListView extends HTMLElement {
     this.cueElementById = new Map()
     this.activeCueElement = null
     this.playbackCueElement = null
-    this.progressiveWaveformRaf = null
     this.handleCueEditorFocus = event => {
       const cueEditor = this.getCueEditorFromEvent(event)
       if (!cueEditor) return
@@ -47,7 +46,6 @@ class CueListView extends HTMLElement {
     this.removeEventListener('focusin', this.handleCueEditorFocus)
     this.removeEventListener('click', this.handleCueEditorClick)
     this.removeEventListener('cuechange', this.handleCueEditorChange)
-    this.cancelProgressiveWaveformRender()
   }
 
   set data(data) {
@@ -65,55 +63,6 @@ class CueListView extends HTMLElement {
     return this.#data
   }
 
-  updateSharedProps(data = {}) {
-    this.#data = { ...this.#data, ...data }
-
-    this.getRenderedCueEditors().forEach(cueEditor => {
-      this.updateCueEditorSharedProps(cueEditor)
-    })
-  }
-
-  updatePlaybackState({ activeCue = this.#data.activeCue, playbackCue = this.#data.playbackCue, playheadTime = this.#data.playheadTime } = {}) {
-    this.#data = {
-      ...this.#data,
-      activeCue,
-      playbackCue,
-      playheadTime
-    }
-    this.activeCueElement = null
-    this.playbackCueElement = null
-
-    this.getRenderedCueEditors().forEach(cueEditor => {
-      const cue = cueEditor.data
-      cueEditor.playheadTime = playheadTime
-      cueEditor.classList.toggle('is-playback-active', this.isSameCue(playbackCue, cue))
-      if (this.isSameCue(activeCue, cue)) this.activeCueElement = cueEditor
-      if (this.isSameCue(playbackCue, cue)) this.playbackCueElement = cueEditor
-    })
-  }
-
-  updateCueRow(cue) {
-    const cueEditor = this.getCueEditorForCue(cue)
-    if (!cueEditor) return false
-
-    const previousCue = cueEditor.data
-    if (previousCue) this.cueElementByCue.delete(previousCue)
-
-    this.configureCueEditor(cueEditor, cue)
-    this.cueElementByCue.set(cue, cueEditor)
-
-    const cueId = this.getCueId(cue)
-    if (cueId !== undefined && cueId !== null) {
-      this.cueElementById.set(cueId, cueEditor)
-    }
-
-    cueEditor.classList.toggle('is-playback-active', this.isSameCue(this.#data.playbackCue, cue))
-    if (this.isSameCue(this.#data.activeCue, cue)) this.activeCueElement = cueEditor
-    if (this.isSameCue(this.#data.playbackCue, cue)) this.playbackCueElement = cueEditor
-
-    return true
-  }
-
   render() {
     const {
       cues = [],
@@ -129,7 +78,6 @@ class CueListView extends HTMLElement {
       handlers = {}
     } = this.#data
 
-    this.cancelProgressiveWaveformRender()
     this.cueElementByCue = new Map()
     this.cueElementById = new Map()
     this.activeCueElement = null
@@ -293,67 +241,6 @@ class CueListView extends HTMLElement {
     if (waveformInputsChanged) {
       cueEditor.renderWaveform?.()
     }
-  }
-
-  getRenderedCueEditors() {
-    return Array.from(new Set(this.cueElementByCue.values()))
-  }
-
-  renderInitialWaveforms(limit = 12) {
-    let renderedCount = 0
-
-    for (const element of this.children) {
-      if (element.localName !== 'cue-editor') continue
-      if (!element.waveForm?.lazyRenderPending) continue
-
-      element.renderWaveform?.({ force: true })
-      renderedCount += 1
-      if (renderedCount >= limit) break
-    }
-  }
-
-  scheduleProgressiveWaveformRender({ startIndex = 0, batchSize = 8 } = {}) {
-    this.cancelProgressiveWaveformRender()
-
-    let childIndex = Math.max(0, startIndex)
-    const renderBatch = () => {
-      let renderedCount = 0
-
-      while (childIndex < this.children.length && renderedCount < batchSize) {
-        const element = this.children[childIndex]
-        childIndex += 1
-        if (element.localName !== 'cue-editor') continue
-        if (!element.waveForm?.lazyRenderPending) continue
-
-        element.renderWaveform?.({ force: true })
-        renderedCount += 1
-      }
-
-      if (childIndex < this.children.length) {
-        this.progressiveWaveformRaf = requestAnimationFrame(renderBatch)
-      } else {
-        this.progressiveWaveformRaf = null
-      }
-    }
-
-    this.progressiveWaveformRaf = requestAnimationFrame(renderBatch)
-  }
-
-  cancelProgressiveWaveformRender() {
-    if (this.progressiveWaveformRaf === null || this.progressiveWaveformRaf === undefined) {
-      this.progressiveWaveformRaf = null
-      return
-    }
-
-    cancelAnimationFrame(this.progressiveWaveformRaf)
-    this.progressiveWaveformRaf = null
-  }
-
-  getCueEditorForCue(cue) {
-    const cueId = this.getCueId(cue)
-    return this.cueElementByCue.get(cue) ??
-      this.cueElementById.get(cueId) ??
-      null
   }
 
   ensureCueRendered(cue, { scroll = false } = {}) {

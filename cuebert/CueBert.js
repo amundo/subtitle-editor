@@ -353,30 +353,24 @@ class CueBert extends HTMLElement {
 
   bindKeyboardEvents() {
     this.globalPlaybackKeydownHandler = event => {
-      if (event.cuebertShortcutHandled) return
-
       if (this.isGlobalPlaybackShortcut(event)) {
-        event.cuebertShortcutHandled = true
         event.preventDefault()
-        event.stopImmediatePropagation?.()
         event.stopPropagation()
         this.transportController.togglePlayback()
         return
       }
 
       if (this.isCueNavigationShortcut(event)) {
-        const cue = this.getKeyboardNavigationCue(event)
+        if (event.target?.closest?.('cue-editor')) return
 
-        event.cuebertShortcutHandled = true
+        const cue = this.getKeyboardNavigationCue(event)
+        if (!cue) return
+
         event.preventDefault()
-        event.stopImmediatePropagation?.()
         event.stopPropagation()
-        if (cue) {
-          this.navigateCueText(cue, event.key === 'ArrowDown' ? 1 : -1)
-        }
+        this.navigateCueText(cue, event.key === 'ArrowDown' ? 1 : -1)
       }
     }
-    window.addEventListener('keydown', this.globalPlaybackKeydownHandler, true)
     document.addEventListener('keydown', this.globalPlaybackKeydownHandler, true)
 
     this.addEventListener('keydown', event => {
@@ -398,7 +392,6 @@ class CueBert extends HTMLElement {
   unbindKeyboardEvents() {
     if (!this.globalPlaybackKeydownHandler) return
 
-    window.removeEventListener('keydown', this.globalPlaybackKeydownHandler, true)
     document.removeEventListener('keydown', this.globalPlaybackKeydownHandler, true)
     this.globalPlaybackKeydownHandler = null
   }
@@ -648,55 +641,17 @@ class CueBert extends HTMLElement {
     this.audioBuffer = audioBuffer
 
     const { envelope, frameDuration } =
-      await this.buildAudioEnvelope(audioBuffer)
+      buildEnvelope(audioBuffer)
 
     this.envelope = envelope
     this.frameDuration = frameDuration
 
-    const insertedCueCount = this.fillAudibleCueGaps()
+    this.fillAudibleCueGaps()
 
-    if (insertedCueCount) {
+    // re-render cues so they can show waveforms
+    if (this.cues.length) {
       this.renderCues()
-    } else {
-      this.updateCueListSharedProps()
     }
-  }
-
-  buildAudioEnvelope(audioBuffer) {
-    if (!window.Worker) return Promise.resolve(buildEnvelope(audioBuffer))
-
-    return new Promise((resolve, reject) => {
-      const worker = new Worker(
-        new URL('./services/AudioAnalyzerWorker.js', import.meta.url),
-        { type: 'module' }
-      )
-      const channelData = audioBuffer.getChannelData(0).slice()
-
-      worker.addEventListener('message', event => {
-        const { type, envelopeData, message } = event.data ?? {}
-        worker.terminate()
-
-        if (type === 'complete') {
-          resolve(envelopeData)
-          return
-        }
-
-        reject(new Error(message || 'Audio analysis worker failed'))
-      }, { once: true })
-
-      worker.addEventListener('error', event => {
-        worker.terminate()
-        reject(event.error ?? new Error(event.message || 'Audio analysis worker failed'))
-      }, { once: true })
-
-      worker.postMessage({
-        channelData,
-        sampleRate: audioBuffer.sampleRate
-      }, [channelData.buffer])
-    }).catch(error => {
-      console.warn('Audio analysis worker failed; falling back to main thread:', error)
-      return buildEnvelope(audioBuffer)
-    })
   }
 
   fillAudibleCueGaps() {
@@ -742,12 +697,6 @@ class CueBert extends HTMLElement {
     return gapCues.length
   }
 
-  renderAfterAudibleCueGapFill() {
-    if (this.fillAudibleCueGaps()) {
-      this.renderCues()
-    }
-  }
-
   getAudibleGapFillSignature() {
     return JSON.stringify(
       this.cues.map(cue => [
@@ -790,7 +739,7 @@ class CueBert extends HTMLElement {
   async loadMatchingMediaForTranscript(transcriptPath) {
     if (!transcriptPath || !this.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
-      this.renderAfterAudibleCueGapFill()
+      this.fillAudibleCueGaps()
       return
     }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
@@ -800,7 +749,7 @@ class CueBert extends HTMLElement {
     })
     if (!mediaPath) return
     if (mediaPath === this.mediaLoadedFromPath) {
-      this.renderAfterAudibleCueGapFill()
+      this.fillAudibleCueGaps()
       return
     }
 
@@ -818,7 +767,7 @@ class CueBert extends HTMLElement {
   async loadMediaForTranscript(transcriptPath, sourceData) {
     if (!this.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
-      this.renderAfterAudibleCueGapFill()
+      this.fillAudibleCueGaps()
       return
     }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
@@ -1306,8 +1255,6 @@ class CueBert extends HTMLElement {
         behavior: options.scrollBehavior ?? 'smooth'
       })
     }
-    element?.renderWaveform?.({ force: true })
-    this.updateCueListPlaybackState()
   }
 
   focusCueText(cue, options = {}) {
@@ -1351,10 +1298,7 @@ class CueBert extends HTMLElement {
         bubbles: true
       }))
     }
-    if (!cue) {
-      this.updateCueListPlaybackState()
-      return
-    }
+    if (!cue) return
 
     const element = this.cueList.ensureCueRendered?.(cue) ??
       this.cueList.cueElementByCue?.get(cue) ??
@@ -1403,7 +1347,6 @@ class CueBert extends HTMLElement {
     }
     this.playbackCue = null
     this.playbackCueElement = null
-    this.updateCueListPlaybackState()
 
     if (endedCue) {
       this.dispatchEvent(new CustomEvent('cueend', {
@@ -1447,7 +1390,6 @@ class CueBert extends HTMLElement {
     }
     this.playbackCue = cue
     this.playbackCueElement = null
-    this.updateCueListPlaybackState()
 
     if (previousCue) {
       this.dispatchEvent(new CustomEvent('cueend', {
@@ -1570,11 +1512,6 @@ class CueBert extends HTMLElement {
   }
 
   updateRenderedSpeakerOptions(speakers) {
-    if (this.cueList?.updateSharedProps) {
-      this.cueList.updateSharedProps({ speakers })
-      return
-    }
-
     this.cueElementByCue?.forEach(cueEditor => {
       cueEditor.speakerOptions = speakers
     })
@@ -1751,7 +1688,7 @@ class CueBert extends HTMLElement {
 
     if (this.addSpeakerInput) this.addSpeakerInput.value = ''
     this.renderSpeakerEditor()
-    this.updateRenderedSpeakerOptions(this.getUniqueSpeakers())
+    this.renderCues()
   }
 
   renderSpeakerEditor() {
@@ -1811,120 +1748,6 @@ class CueBert extends HTMLElement {
     return searchMatchedCues
   }
 
-  getCueListData({ visibleCues = this.getVisibleCues(), isSearching = this.cueSearchQuery.trim().length > 0 } = {}) {
-    return {
-      cues: visibleCues,
-      allowMerge: !isSearching,
-      video: this.video,
-      activeCue: this.activeCue,
-      playbackCue: this.playbackCue,
-      speakers: this.getUniqueSpeakers(),
-      envelope: this.envelope,
-      frameDuration: this.frameDuration,
-      playheadTime: this.video?.currentTime,
-      formatTime,
-      handlers: this.getCueListHandlers()
-    }
-  }
-
-  getCueListHandlers() {
-    return {
-      onPlayCue: cue => {
-        this.transportController.toggleTimeRange(cue.start, cue.end)
-      },
-      onSetSpeaker: (cue, nextSpeaker, cueEditor) => {
-        this.setCueSpeaker(cue, nextSpeaker, cueEditor)
-      },
-      onSplitCue: (cue, selection) => {
-        this.splitCue(cue, selection)
-      },
-      onDeleteCue: cue => {
-        this.deleteCue(cue)
-      },
-      onNavigateCue: (cue, direction) => {
-        this.navigateCueText(cue, direction)
-      },
-      onWaveformSeek: (cue, time, cueEditor) => {
-        this.setActiveCue(cue, cueEditor)
-        this.video.currentTime = this.clamp(
-          time,
-          0,
-          this.transportController.getMediaDuration()
-        )
-        this.transportController.updateUi()
-        this.updateRenderedWaveformPlayheads(this.video.currentTime)
-        this.syncActiveCueToPlayback('transport-seek')
-      },
-      onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
-        cueEditor.updateBoundaryPreviewLabels(
-          this.getCueBoundaryPreview(cue, edge, time)
-        )
-      },
-      onWaveformBoundaryCommit: (cue, { edge, time }, cueEditor) => {
-        const nextEdge = this.setCueBoundary(cue, edge, time)
-        cueEditor.updateTimeLabels()
-        cueEditor.renderWaveform({ force: true })
-        this.transportController.playBoundaryPreview(cue, nextEdge)
-        this.markDirty()
-      },
-      onFocusCue: (cue, cueEditor) => {
-        this.setActiveCue(cue, cueEditor)
-      },
-      onCueChange: () => {
-        this.markDirty()
-      },
-      onMergeCues: (previousCue, nextCue) => {
-        this.mergeCues(previousCue, nextCue)
-      }
-    }
-  }
-
-  updateCueListSharedProps(data = {}, { renderWaveforms = true } = {}) {
-    if (!this.cueList?.updateSharedProps) return
-
-    this.cueList.updateSharedProps(
-      {
-        video: this.video,
-        speakers: this.getUniqueSpeakers(),
-        envelope: this.envelope,
-        frameDuration: this.frameDuration,
-        playheadTime: this.video?.currentTime,
-        formatTime,
-        handlers: this.getCueListHandlers(),
-        ...data
-      }
-    )
-    if (renderWaveforms) this.renderInitialWaveforms()
-  }
-
-  updateCueListPlaybackState() {
-    if (!this.cueList) return
-
-    this.cueList?.updatePlaybackState?.({
-      activeCue: this.activeCue,
-      playbackCue: this.playbackCue,
-      playheadTime: this.video?.currentTime
-    })
-    this.syncCueListElementReferences({ restoreFocus: false })
-  }
-
-  updateCueRow(cue) {
-    if (!this.cueList?.updateCueRow?.(cue)) return false
-
-    this.syncCueListElementReferences({ restoreFocus: false })
-    return true
-  }
-
-  renderInitialWaveforms() {
-    if (!this.envelope || !this.frameDuration) return
-
-    this.cueList?.renderInitialWaveforms?.(12)
-    this.cueList?.scheduleProgressiveWaveformRender?.({
-      startIndex: 12,
-      batchSize: 8
-    })
-  }
-
   updateCueSearchCount({ visibleCues, matchedCues }) {
     if (!this.cueSearchCount) return
 
@@ -1948,21 +1771,76 @@ class CueBert extends HTMLElement {
     const isSearching = this.cueSearchQuery.trim().length > 0
     this.updateCueSearchCount({ visibleCues, matchedCues })
 
-    this.cueList.data = this.getCueListData({ visibleCues, isSearching })
+    this.cueList.data = {
+      cues: visibleCues,
+      allowMerge: !isSearching,
+      video: this.video,
+      activeCue: this.activeCue,
+      playbackCue: this.playbackCue,
+      speakers: this.getUniqueSpeakers(),
+      envelope: this.envelope,
+      frameDuration: this.frameDuration,
+      playheadTime: this.video?.currentTime,
+      formatTime,
+      handlers: {
+        onPlayCue: cue => {
+          this.transportController.toggleTimeRange(cue.start, cue.end)
+        },
+        onSetSpeaker: (cue, nextSpeaker, cueEditor) => {
+          this.setCueSpeaker(cue, nextSpeaker, cueEditor)
+        },
+        onSplitCue: (cue, selection) => {
+          this.splitCue(cue, selection)
+        },
+        onDeleteCue: cue => {
+          this.deleteCue(cue)
+        },
+        onNavigateCue: (cue, direction) => {
+          this.navigateCueText(cue, direction)
+        },
+        onWaveformSeek: (cue, time, cueEditor) => {
+          this.setActiveCue(cue, cueEditor)
+          this.video.currentTime = this.clamp(
+            time,
+            0,
+            this.transportController.getMediaDuration()
+          )
+          this.transportController.updateUi()
+          this.updateRenderedWaveformPlayheads(this.video.currentTime)
+          this.syncActiveCueToPlayback('transport-seek')
+        },
+        onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
+          cueEditor.updateBoundaryPreviewLabels(
+            this.getCueBoundaryPreview(cue, edge, time)
+          )
+        },
+        onWaveformBoundaryCommit: (cue, { edge, time }, cueEditor) => {
+          const nextEdge = this.setCueBoundary(cue, edge, time)
+          cueEditor.updateTimeLabels()
+          cueEditor.renderWaveform()
+          this.transportController.playBoundaryPreview(cue, nextEdge)
+          this.markDirty()
+        },
+        onFocusCue: (cue, cueEditor) => {
+          this.setActiveCue(cue, cueEditor)
+        },
+        onCueChange: () => {
+          this.markDirty()
+        },
+        onMergeCues: (previousCue, nextCue) => {
+          this.mergeCues(previousCue, nextCue)
+        }
+      }
+    }
 
     this.syncCueListRenderState()
-    this.renderInitialWaveforms()
   }
 
   syncCueListRenderState() {
-    this.syncCueListElementReferences()
-  }
-
-  syncCueListElementReferences({ restoreFocus = true } = {}) {
     this.cueElementByCue = this.cueList.cueElementByCue
     this.activeCueElement = this.cueList.activeCueElement
     this.playbackCueElement = this.cueList.playbackCueElement
-    if (restoreFocus) this.restoreKeyboardCueFocus()
+    this.restoreKeyboardCueFocus()
   }
 
   restoreKeyboardCueFocus() {
