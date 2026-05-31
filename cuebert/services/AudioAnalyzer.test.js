@@ -1,4 +1,8 @@
-import { getAudibleCueGaps, hasSoundInRange } from "./AudioAnalyzer.js";
+import {
+  getAudibleCueGaps,
+  hasSoundAroundBoundary,
+  hasSoundInRange,
+} from "./AudioAnalyzer.js";
 
 function assertEquals(actual, expected) {
   if (JSON.stringify(actual) === JSON.stringify(expected)) return;
@@ -73,4 +77,26 @@ Deno.test("getAudibleCueGaps ignores audible gaps shorter than 500ms", () => {
   );
 
   assertEquals(gaps, []);
+});
+
+Deno.test("hasSoundAroundBoundary detects continuous speech across a boundary", () => {
+  const audio = {
+    envelope: [0, 0.02, 0.03, 0],
+    frameDuration: 0.1,
+  };
+
+  assertEquals(
+    hasSoundAroundBoundary(audio, 0.2, {
+      windowDuration: 0.1,
+      threshold: 0.01,
+    }),
+    true,
+  );
+  assertEquals(
+    hasSoundAroundBoundary(audio, 0.1, {
+      windowDuration: 0.1,
+      threshold: 0.01,
+    }),
+    false,
+  );
 });

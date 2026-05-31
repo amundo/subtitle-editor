@@ -10,11 +10,12 @@ function parseSubtitleFile(text, fileName = '') {
   if (looksLikeJson) {
     try {
       const parsed = JSON.parse(text)
-      const sourceData = isWhisperCppJson(parsed)
-        ? parseWhisperCpp(parsed)
-        : parsed
+      if (isWhisperCppJson(parsed)) {
+        const sourceData = parseWhisperCpp(parsed)
+        return parseAtrainJson(sourceData, { preferSegmentTiming: true })
+      }
 
-      return parseAtrainJson(sourceData)
+      return parseAtrainJson(parsed)
     } catch (err) {
       if (!trimmed.startsWith('WEBVTT')) throw err
     }
@@ -71,22 +72,30 @@ function parseVtt(text) {
   return cues
 }
 
-function parseWhisperCpp(text) {
+function parseWhisperCpp(text, {
+  vadStatus = 'unknown'
+} = {}) {
   const input = typeof text === 'string' ? JSON.parse(text) : text
 
   if (!isWhisperCppJson(input)) {
     throw new Error('Expected whisper.cpp JSON with transcription[]')
   }
 
-  const isSpecial = token => /^\[_.+\]$/.test(token.text)
+  const isSpecial = token => {
+    const text = typeof token?.text === 'string' ? token.text : ''
 
+    return text.startsWith('[_') &&
+      text.endsWith(']') &&
+      text.length >= 4
+  }
+    
   const cleanText = text =>
     text
       .replace(/\s+/g, ' ')
       .replace(/\s+([,.!?;:])/g, '$1')
       .trim()
 
-  const segments = input.transcription.map((segment, index) => {
+  const sourceSegments = input.transcription.map((segment, index) => {
     const tokens = Array.isArray(segment.tokens) ? segment.tokens : []
     const usableTokens = tokens.filter(token => !isSpecial(token))
 
@@ -107,6 +116,13 @@ function parseWhisperCpp(text) {
       speaker: null
     }
   })
+  const useSourceSegments = vadStatus === 'ok' || hasNonGlobalWordTimings(sourceSegments)
+  const segments = useSourceSegments
+    ? sourceSegments.map(sourceSegment => ({
+      ...sourceSegment,
+      words: []
+    }))
+    : normalizeCueTimeline(segmentWhisperCppCues(sourceSegments))
 
   return {
     segments,
@@ -115,23 +131,201 @@ function parseWhisperCpp(text) {
       speakers: [],
       media: null,
       language: input.result?.language ?? input.params?.language ?? null,
-      model: input.model?.type ?? null
+      model: input.model?.type ?? null,
+      transcriptionStatus: {
+        vad: vadStatus,
+        diarization: 'missing',
+        cueSegmentation: 'ok'
+      }
     }
   }
 }
 
-function parseAtrainJson(text) {
-  const parsed = typeof text === 'string' ? JSON.parse(text) : text
-  const segments = Array.isArray(parsed) ? parsed : parsed?.segments
+const CUE_SEGMENTATION = {
+  minDuration: 0.05,
+  maxDuration: 6.5,
+  maxChars: 84,
+  maxWords: 16,
+  minDurationBeforeSoftBreak: 1.2,
+  softBreakPunctuation: /[.!?;:。！？¿¡]$/,
+  mediumBreakPunctuation: /[,，]$/
+}
 
-  if (!Array.isArray(segments)) {
+function segmentWhisperCppCues(sourceSegments) {
+  const cues = []
+
+  sourceSegments.forEach(sourceSegment => {
+    const words = Array.isArray(sourceSegment.words)
+      ? sourceSegment.words.filter(isTimedWord)
+      : []
+
+    if (!words.length) {
+      cues.push({
+        ...sourceSegment,
+        id: cues.length + 1,
+        sourceSegmentId: sourceSegment.id
+      })
+      return
+    }
+
+    const wordGroups = splitWordsIntoCueGroups(words)
+    wordGroups.forEach(wordGroup => {
+      const start = wordGroup[0].start
+      const end = wordGroup.at(-1).end
+      const text = cleanCueWords(wordGroup)
+
+      if (!text) return
+
+      cues.push({
+        ...sourceSegment,
+        id: cues.length + 1,
+        start,
+        end,
+        text: ` ${text}`,
+        words: wordGroup,
+        sourceSegmentId: sourceSegment.id
+      })
+    })
+  })
+
+  return cues
+}
+
+function normalizeCueTimeline(cues) {
+  const normalized = cues
+    .filter(cue =>
+      Number.isFinite(cue?.start) &&
+      Number.isFinite(cue?.end) &&
+      cue.end > cue.start
+    )
+    .sort((firstCue, secondCue) => {
+      if (firstCue.start !== secondCue.start) {
+        return firstCue.start - secondCue.start
+      }
+      return firstCue.end - secondCue.end
+    })
+
+  for (let index = 1; index < normalized.length; index++) {
+    const previousCue = normalized[index - 1]
+    const cue = normalized[index]
+
+    if (cue.start >= previousCue.end) continue
+
+    const boundary = clamp(
+      cue.start,
+      previousCue.start + CUE_SEGMENTATION.minDuration,
+      cue.end - CUE_SEGMENTATION.minDuration
+    )
+
+    previousCue.end = Math.min(previousCue.end, boundary)
+    cue.start = Math.max(cue.start, boundary)
+  }
+
+  return normalized.filter(cue => cue.end > cue.start)
+}
+
+function hasNonGlobalWordTimings(sourceSegments) {
+  return sourceSegments.some(sourceSegment => {
+    const firstWord = sourceSegment.words?.find(isTimedWord)
+    if (!firstWord) return false
+
+    return firstWord.start + 1 < sourceSegment.start
+  })
+}
+
+function splitWordsIntoCueGroups(words) {
+  const groups = []
+  let group = []
+
+  for (let index = 0; index < words.length; index++) {
+    const word = words[index]
+    group.push(word)
+
+    if (index === words.length - 1 || shouldEndCueGroup(group, words[index + 1])) {
+      groups.push(group)
+      group = []
+    }
+  }
+
+  return groups
+}
+
+function shouldEndCueGroup(group, nextWord) {
+  if (!nextWord || !group.length) return true
+
+  const firstWord = group[0]
+  const lastWord = group.at(-1)
+  const duration = lastWord.end - firstWord.start
+  const nextDuration = nextWord.end - firstWord.start
+  const text = cleanCueWords(group)
+  const nextText = cleanCueWords([...group, nextWord])
+  const lastText = String(lastWord.word ?? '').trim()
+
+  if (
+    duration >= CUE_SEGMENTATION.minDurationBeforeSoftBreak &&
+    CUE_SEGMENTATION.softBreakPunctuation.test(lastText)
+  ) {
+    return true
+  }
+
+  if (
+    duration >= CUE_SEGMENTATION.minDurationBeforeSoftBreak &&
+    CUE_SEGMENTATION.mediumBreakPunctuation.test(lastText) &&
+    (nextDuration > CUE_SEGMENTATION.maxDuration || nextText.length > CUE_SEGMENTATION.maxChars)
+  ) {
+    return true
+  }
+
+  return (
+    nextDuration > CUE_SEGMENTATION.maxDuration ||
+    nextText.length > CUE_SEGMENTATION.maxChars ||
+    group.length >= CUE_SEGMENTATION.maxWords ||
+    text.length >= CUE_SEGMENTATION.maxChars
+  )
+}
+
+function cleanCueWords(words) {
+  return cleanSegmentText(words.map(word => word.word ?? '').join(''))
+}
+
+function cleanSegmentText(text) {
+  return String(text ?? '')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,.!?;:])/g, '$1')
+    .trim()
+}
+
+function clamp(value, min, max) {
+  if (max < min) return min
+  return Math.min(max, Math.max(min, value))
+}
+
+function isTimedWord(word) {
+  return (
+    Number.isFinite(word?.start) &&
+    Number.isFinite(word?.end) &&
+    word.end > word.start &&
+    String(word.word ?? '').trim()
+  )
+}
+
+function parseAtrainJson(text, { preferSegmentTiming = false } = {}) {
+  const parsed = typeof text === 'string' ? JSON.parse(text) : text
+  const rawSegments = Array.isArray(parsed) ? parsed : parsed?.segments
+
+  if (!Array.isArray(rawSegments)) {
     throw new Error('Expected a JSON array or an object with segments[]')
   }
 
-  const cues = segments
+  const useSegmentTiming =
+    preferSegmentTiming ||
+    parsed?.metadata?.transcriptionStatus?.vad === 'ok'
+
+  const cues = rawSegments
     .filter(segment =>
       Number.isFinite(segment?.start) &&
-      Number.isFinite(segment?.end)
+      Number.isFinite(segment?.end) &&
+      segment?.generatedFromAudioGap !== true
     )
     .map((segment, index) => {
       const rawText =
@@ -142,21 +336,47 @@ function parseAtrainJson(text) {
       const speaker = getSegmentSpeaker(segment)
       const sourceId = segment.id ?? index + 1
 
+      const timing = getSegmentCueTiming(segment, { preferSegmentTiming: useSegmentTiming })
+
       return {
         id: sourceId,
-        start: Number(segment.start),
-        end: Number(segment.end),
+        start: timing.start,
+        end: timing.end,
         text: rawText.trim(),
         speaker,
         sourceSegmentId: sourceId,
         sourceSegmentIds: [sourceId]
       }
     })
+    .filter(cue =>
+      Number.isFinite(cue?.start) &&
+      Number.isFinite(cue?.end) &&
+      cue.end > cue.start
+    )
 
   return {
     format: 'atrain-json',
     cues,
     sourceData: parsed
+  }
+}
+
+function getSegmentCueTiming(segment, { preferSegmentTiming = false } = {}) {
+  const segmentTiming = {
+    start: Number(segment.start),
+    end: Number(segment.end)
+  }
+  const words = Array.isArray(segment?.words)
+    ? segment.words.filter(isTimedWord)
+    : []
+
+  if (!words.length || preferSegmentTiming) {
+    return segmentTiming
+  }
+
+  return {
+    start: words[0].start,
+    end: words.at(-1).end
   }
 }
 
@@ -211,8 +431,11 @@ function buildWhisperCppWords(tokens) {
       continue
     }
 
+    const isPunctuationOnly = /^[,.!?;:¿¡]+$/.test(trimmed)
     current.word += text
-    current.end = msToSeconds(token.offsets?.to)
+    if (!isPunctuationOnly) {
+      current.end = msToSeconds(token.offsets?.to)
+    }
     current.probability = averageProbabilities(current.probability, token.p)
   }
 

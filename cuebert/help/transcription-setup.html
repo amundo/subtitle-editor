@@ -134,7 +134,7 @@
 
     <p>
       If the kit is ready, it will show the whisper.cpp program and model it
-      found.
+      found. A kit with VAD support will also show the Silero VAD model.
     </p>
 
     <h2>Transcribe One File</h2>
@@ -147,6 +147,11 @@
       This writes:
     </p>
     <pre><code>~/Desktop/interview.json</code></pre>
+    <p>
+      The JSON is prepared for Cuebert editing: VAD finds speech and silence,
+      Cuebert adds readable cue breaks, and speaker labels are left blank for
+      manual review.
+    </p>
 
     <h2>Open It in Cuebert</h2>
     <ol>
@@ -176,6 +181,15 @@ interview.mp3</code></pre>
     <h3>Spanish audio</h3>
     <pre><code>cuebert-transcribe --language es ~/Desktop/interview.mp3</code></pre>
 
+    <h3>More conservative VAD splits</h3>
+    <pre><code>cuebert-transcribe --language es --vad-silence-ms 500 --vad-pad-ms 200 ~/Desktop/interview.mp3</code></pre>
+
+    <h3>Compare without VAD</h3>
+    <pre><code>cuebert-transcribe --no-vad ~/Desktop/interview.mp3</code></pre>
+
+    <h3>Use CPU if Metal crashes</h3>
+    <pre><code>cuebert-transcribe --no-gpu ~/Desktop/interview.mp3</code></pre>
+
     <h3>Replace an existing transcript</h3>
     <pre><code>cuebert-transcribe --overwrite ~/Desktop/interview.mp3</code></pre>
 
@@ -189,8 +203,13 @@ interview.mp3</code></pre>
     <pre><code>cuebert-transcription-kit/
   cuebert-transcribe
   whisper-cli
+  lib/
+    libwhisper.1.dylib
+    libggml.0.dylib
+    ...
   models/
-    ggml-large-v3.bin</code></pre>
+    ggml-small.bin
+    ggml-silero-v6.2.0.bin</code></pre>
 
     <p>
       On Windows, the executable names are <code>cuebert-transcribe.exe</code>

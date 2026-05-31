@@ -115,4 +115,36 @@ function getAudibleCueGaps(
   return gaps;
 }
 
-export { buildEnvelope, getAudibleCueGaps, getSoundThreshold, hasSoundInRange };
+function hasSoundAroundBoundary(
+  { envelope, frameDuration },
+  boundary,
+  {
+    windowDuration = 0.18,
+    threshold = getSoundThreshold(envelope ?? []),
+  } = {},
+) {
+  if (!Number.isFinite(boundary)) return false;
+
+  return (
+    hasSoundInRange(
+      { envelope, frameDuration },
+      boundary - windowDuration,
+      boundary,
+      { threshold },
+    ) &&
+    hasSoundInRange(
+      { envelope, frameDuration },
+      boundary,
+      boundary + windowDuration,
+      { threshold },
+    )
+  );
+}
+
+export {
+  buildEnvelope,
+  getAudibleCueGaps,
+  getSoundThreshold,
+  hasSoundAroundBoundary,
+  hasSoundInRange,
+};

@@ -3,6 +3,9 @@
 This guide assumes the transcription kit has already been prepared. In the
 desktop app, it is also available from **Help > Transcription Setup Guide**.
 
+For a step-by-step checklist to install the prepared kit on another Mac, see
+[Install Cuebert transcription kit on another Mac](install-cuebert-transcription-kit-on-mac.md).
+
 ## For the transcriber
 
 Put each media file somewhere easy to find, such as the Desktop.
@@ -21,6 +24,13 @@ The command writes a JSON transcript next to the media file:
 
 Open that JSON file in Cuebert with **Load transcript**. If the media file is
 next to it, Cuebert should automatically load the audio or video too.
+
+The JSON is prepared for editing:
+
+- VAD finds where speech and silence are.
+- Cuebert adds readable transcript/editor cue breaks.
+- Speaker labels are not diarized yet, so the editor assigns speakers in
+  Cuebert.
 
 Send both files to the editor:
 
@@ -46,6 +56,26 @@ Transcribe Spanish audio:
 cuebert-transcribe --language es ~/Desktop/interview.mp3
 ```
 
+Use VAD-aware segmentation:
+
+```sh
+cuebert-transcribe --language es ~/Desktop/interview.mp3
+```
+
+When `models/ggml-silero-v6.2.0.bin` is present in the kit, the wrapper uses
+it automatically. To tune mixed interview audio, start with the defaults and
+adjust only one value at a time:
+
+```sh
+cuebert-transcribe \
+  --language es \
+  --vad-silence-ms 500 \
+  --vad-pad-ms 200 \
+  ~/Desktop/interview.mp3
+```
+
+Use `--no-vad` to compare against raw whisper.cpp segmentation.
+
 Replace an existing JSON transcript:
 
 ```sh
@@ -67,9 +97,19 @@ this:
 cuebert-transcription-kit/
   cuebert-transcribe
   whisper-cli
+  lib/
+    libwhisper.1.dylib
+    libggml.0.dylib
+    ...
   models/
-    ggml-large-v3.bin
+    ggml-small.bin
+    ggml-silero-v6.2.0.bin
 ```
+
+The Whisper model file name can vary. The wrapper auto-finds the first `.bin`
+file in the kit's `models/` folder that is not a VAD model. The VAD model is
+optional, but `ggml-silero-v6.2.0.bin` is recommended for mixed interview
+audio.
 
 On Windows, the executable names are:
 
@@ -85,6 +125,7 @@ The person preparing the kit needs to provide:
 - the compiled `cuebert-transcribe` wrapper
 - a matching `whisper-cli` binary for the operating system
 - one whisper.cpp `ggml` model in the `models/` folder
+- `ggml-silero-v6.2.0.bin` in the `models/` folder for VAD segmentation
 
 No Deno, Homebrew, Git, or Xcode install is needed on the transcriber's machine
 when those files are already in the kit.

@@ -3,9 +3,10 @@ import './cue-editor/CueEditor.js'
 import './cue-list-view/CueListView.js'
 import { formatTime, parseTime } from './services/time.js'
 import { AutosaveController } from './services/AutosaveController.js'
-import { buildEnvelope, getAudibleCueGaps } from './services/AudioAnalyzer.js'
+import { buildEnvelope, getAudibleCueGaps, hasSoundAroundBoundary } from './services/AudioAnalyzer.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
+import { getCueSourceSegmentIds } from './services/TranscriptExporter.js'
 import { TransportController } from './services/TransportController.js'
 import { CueSearchController } from './services/CueSearchController.js'
 import { CueStore } from './services/CueStore.js'
@@ -63,6 +64,7 @@ class CueBert extends HTMLElement {
     this.envelope = null
     this.frameDuration = null
     this.filledAudibleGapsSignature = ''
+    this.reflowedAudioBoundariesSignature = ''
     this.lastWaveformPlayheadTime = null
 
     // cue focus/playback UI state
@@ -646,7 +648,10 @@ class CueBert extends HTMLElement {
     this.envelope = envelope
     this.frameDuration = frameDuration
 
-    this.fillAudibleCueGaps()
+    this.reflowGeneratedCueBoundaries()
+    if (this.shouldFillGapsWithCurrentAudio()) {
+      this.fillAudibleCueGaps()
+    }
 
     // re-render cues so they can show waveforms
     if (this.cues.length) {
@@ -707,6 +712,72 @@ class CueBert extends HTMLElement {
     )
   }
 
+  reflowGeneratedCueBoundaries() {
+    if (!this.isGeneratedTranscript(this.loadedTranscript)) return 0
+    if (!this.cues.length || !this.envelope || !this.frameDuration) return 0
+
+    const signature = this.getAudioBoundaryReflowSignature()
+    if (signature === this.reflowedAudioBoundariesSignature) return 0
+
+    const maxMergedDuration = 14
+    const maxMergedChars = 220
+    const nextCues = []
+    let mergeCount = 0
+
+    for (const cue of this.cues) {
+      const previousCue = nextCues.at(-1)
+      const previousText = (previousCue?.text || '').trim()
+      const cueText = (cue?.text || '').trim()
+      const joinedText = this.joinCueText(previousText, cueText)
+      const canMerge = (
+        previousCue &&
+        Number.isFinite(previousCue.end) &&
+        Number.isFinite(cue?.start) &&
+        Math.abs(previousCue.end - cue.start) < 0.08 &&
+        cue.end - previousCue.start <= maxMergedDuration &&
+        joinedText.length <= maxMergedChars &&
+        hasSoundAroundBoundary(
+          { envelope: this.envelope, frameDuration: this.frameDuration },
+          cue.start
+        )
+      )
+
+      if (!canMerge) {
+        nextCues.push({ ...cue })
+        continue
+      }
+
+      previousCue.end = cue.end
+      previousCue.text = joinedText
+      previousCue.sourceSegmentIds = [
+        ...new Set([
+          ...getCueSourceSegmentIds(previousCue),
+          ...getCueSourceSegmentIds(cue)
+        ])
+      ]
+      mergeCount++
+    }
+
+    this.reflowedAudioBoundariesSignature = signature
+    if (!mergeCount) return 0
+
+    this.cues = nextCues
+    this.markDirty()
+    window.cuebertLog?.('info', 'reflowed-generated-cue-boundaries', {
+      mergeCount,
+      cueCount: nextCues.length
+    })
+    return mergeCount
+  }
+
+  getAudioBoundaryReflowSignature() {
+    return JSON.stringify([
+      this.loadedTranscriptPath,
+      this.mediaLoadedFromPath,
+      this.cues.map(cue => [cue.start, cue.end, cue.text])
+    ])
+  }
+
   // ---------- time helpers ----------
 
 
@@ -739,7 +810,9 @@ class CueBert extends HTMLElement {
   async loadMatchingMediaForTranscript(transcriptPath) {
     if (!transcriptPath || !this.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
-      this.fillAudibleCueGaps()
+      if (this.shouldFillGapsWithCurrentAudio()) {
+        this.fillAudibleCueGaps()
+      }
       return
     }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
@@ -749,7 +822,9 @@ class CueBert extends HTMLElement {
     })
     if (!mediaPath) return
     if (mediaPath === this.mediaLoadedFromPath) {
-      this.fillAudibleCueGaps()
+      if (this.shouldFillGapsWithCurrentAudio()) {
+        this.fillAudibleCueGaps()
+      }
       return
     }
 
@@ -767,7 +842,9 @@ class CueBert extends HTMLElement {
   async loadMediaForTranscript(transcriptPath, sourceData) {
     if (!this.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
-      this.fillAudibleCueGaps()
+      if (this.shouldFillGapsWithCurrentAudio(sourceData)) {
+        this.fillAudibleCueGaps()
+      }
       return
     }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
@@ -875,6 +952,7 @@ class CueBert extends HTMLElement {
     this.changeRevision = 0
     this.lastAutosavedAt = null
     this.renderSpeakerEditor()
+    this.reflowGeneratedCueBoundaries()
     if (this.shouldFillGapsWithCurrentAudio(document.sourceData)) {
       this.fillAudibleCueGaps()
     }
@@ -898,6 +976,7 @@ class CueBert extends HTMLElement {
   }
 
   shouldFillGapsWithCurrentAudio(sourceData) {
+    if (this.isGeneratedTranscript(sourceData ?? this.loadedTranscript)) return false
     if (!this.envelope || !this.frameDuration) return false
     if (this.mediaLoadedManually) return true
     if (!this.mediaLoadedFromPath) return false
@@ -905,6 +984,16 @@ class CueBert extends HTMLElement {
 
     const metadataMediaPath = this.getTranscriptMetadataMediaPath(sourceData)
     return metadataMediaPath === this.mediaLoadedFromPath
+  }
+
+  isGeneratedTranscript(sourceData) {
+    if (!sourceData) return false
+    const metadata = Array.isArray(sourceData) ? null : sourceData.metadata
+    if (metadata?.transcriptionStatus) return true
+    const segments = Array.isArray(sourceData) ? sourceData : sourceData.segments
+    return Array.isArray(segments) && segments.some(segment =>
+      Array.isArray(segment?.words) && segment.words.length
+    )
   }
 
   refreshPreviewTrack() {

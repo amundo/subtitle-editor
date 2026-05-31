@@ -4,110 +4,97 @@
       "description": "Run Tauri CLI via Deno (no Node install required)",
       "command": "deno run -A npm:@tauri-apps/cli@2"
     },
-
     "dev": {
       "description": "Start Tauri in development mode (hot reload, fast iteration)",
       "command": "deno task tauri dev"
     },
-
     "build": {
       "description": "Build production Tauri app bundle",
       "command": "deno task tauri build"
     },
-
     "build:debug": {
       "description": "Build debug version of Tauri app",
       "command": "deno task tauri build --debug"
     },
-
     "build:all": {
       "description": "Build release and debug DMGs",
       "command": "deno task build && deno task build:debug"
     },
-
     "clean": {
       "description": "Remove Tauri/Rust build artifacts so the next build is fresh",
       "command": "cargo clean --manifest-path src-tauri/Cargo.toml"
     },
-
     "rebuild": {
       "description": "Clean and rebuild the production Tauri app bundle",
       "command": "deno task clean && deno task build"
     },
-
     "rebuild:debug": {
       "description": "Clean and rebuild the debug Tauri app bundle",
       "command": "deno task clean && deno task build:debug"
     },
-
     "run:binary": {
       "description": "Run built app binary directly (fast, shows logs in terminal)",
       "command": "./src-tauri/target/release/bundle/macos/Cuebert.app/Contents/MacOS/cuebert"
     },
-
     "run:debug": {
       "description": "Run built debug binary directly (fast, shows logs in terminal)",
       "command": "./src-tauri/target/debug/cuebert"
     },
-
     "run:app": {
       "description": "Open built .app via Finder (simulates real user launch)",
       "command": "open ./src-tauri/target/release/bundle/macos/Cuebert.app"
     },
-
     "run:dmg": {
       "description": "Open the generated DMG installer",
       "command": "open ./src-tauri/target/release/bundle/dmg"
     },
-
     "test:binary": {
       "description": "Build app and run binary with terminal logs",
       "command": "deno task build && deno task run:binary"
     },
-
     "test:app": {
       "description": "Build app and open it like a user would",
       "command": "deno task build && deno task run:app"
     },
-
     "icons": {
       "description": "Regenerate app icons",
       "command": "bash scripts/update-icons.sh"
     },
-
     "version": {
       "description": "Update app version in config files",
       "command": "deno run --allow-read --allow-write scripts/bump-version.js"
     },
-
     "transcribe": {
       "description": "Run whisper.cpp and create Cuebert-loadable JSON",
-      "command": "deno run --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL scripts/cuebert-transcribe.js"
+      "command": "deno run --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL,WHISPER_CPP_VAD_MODEL scripts/cuebert-transcribe.js"
     },
-
     "transcribe:compile": {
       "description": "Build the Cuebert whisper.cpp preprocessor as a local binary",
-      "command": "deno compile --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL --output cuebert-transcribe scripts/cuebert-transcribe.js"
+      "command": "deno compile --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL,WHISPER_CPP_VAD_MODEL --output cuebert-transcribe scripts/cuebert-transcribe.js"
     },
-
     "logs": {
       "description": "Show last 200 lines of app log file",
       "command": "tail -n 200 ~/Library/Logs/Cuebert/cuebert.log"
     },
-
     "logs:follow": {
       "description": "Follow app log file in real time",
       "command": "tail -f ~/Library/Logs/Cuebert/cuebert.log"
     },
-
     "context:zip": {
       "description": "Create a slim zip of source/config files for AI handoff",
       "command": "deno run -A compress.js"
     },
-
     "run:dev": {
       "description": "Run Deno frontend script directly (non-Tauri dev mode)",
       "command": "deno run -A src/main"
+    },
+    "transcribe:package": {
+      "description": "Build the Cuebert transcription kit",
+      "command": "sh package-kit.sh"
+    },
+    "transcribe:zip": {
+      "description": "Build and zip the Cuebert transcription kit for AirDrop",
+      "command": "deno task transcribe:package && rm -f cuebert-transcription-kit.zip && zip -r cuebert-transcription-kit.zip cuebert-transcription-kit"
     }
   }
 }
