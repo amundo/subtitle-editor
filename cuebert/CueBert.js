@@ -4,6 +4,8 @@ import './cue-list-view/CueListView.js'
 import { formatTime, parseTime } from './services/time.js'
 import { AutosaveController } from './services/AutosaveController.js'
 import { buildEnvelope, getAudibleCueGaps, hasSoundAroundBoundary } from './services/AudioAnalyzer.js'
+import { FileController } from './services/FileController.js'
+import { KeyboardController } from './services/KeyboardController.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { getCueSourceSegmentIds } from './services/TranscriptExporter.js'
@@ -50,6 +52,7 @@ class CueBert extends HTMLElement {
     this.lastAutosavedAt = null
     this.lastAutosaveDiagnosticSignature = ''
     this.autosaveController = new AutosaveController()
+    this.fileController = new FileController()
     this.speakerController = new SpeakerController()
     this.transcriptDocument = new TranscriptDocument()
     this.cueSearchController = new CueSearchController()
@@ -72,7 +75,7 @@ class CueBert extends HTMLElement {
     this.playbackCue = null
     this.playbackCueElement = null
     this.transportPlaybackHighlightActive = false
-    this.globalPlaybackKeydownHandler = null
+    this.keyboardController = null
     this.keyboardFocusedCue = null
   }
 
@@ -97,7 +100,7 @@ class CueBert extends HTMLElement {
   }
 
   disconnectedCallback() {
-    this.unbindKeyboardEvents()
+    this.keyboardController?.unbind()
     this.cancelScheduledAutosave()
   }
 
@@ -322,7 +325,14 @@ class CueBert extends HTMLElement {
     this.transportController.bindTransportControls()
     this.bindPreferenceEvents()
     this.bindCueSearchEvents()
-    this.bindKeyboardEvents()
+    this.keyboardController = new KeyboardController({
+      element: this,
+      onTogglePlayback: () => this.transportController.togglePlayback(),
+      onNavigateCue: (cue, direction) => this.navigateCueText(cue, direction),
+      onFocusCueSearch: () => this.focusCueSearch(),
+      getActiveCue: () => this.activeCue
+    })
+    this.keyboardController.bind()
     this.bindCueListEvents()
 
     this.transportController.updateUi()
@@ -332,75 +342,6 @@ class CueBert extends HTMLElement {
     this.cueList.addEventListener('cuelistrender', () => {
       this.syncCueListRenderState()
     })
-  }
-
-  bindKeyboardEvents() {
-    this.globalPlaybackKeydownHandler = event => {
-      if (this.isGlobalPlaybackShortcut(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        this.transportController.togglePlayback()
-        return
-      }
-
-      if (this.isCueNavigationShortcut(event)) {
-        if (event.target?.closest?.('cue-editor')) return
-
-        const cue = this.getKeyboardNavigationCue(event)
-        if (!cue) return
-
-        event.preventDefault()
-        event.stopPropagation()
-        this.navigateCueText(cue, event.key === 'ArrowDown' ? 1 : -1)
-      }
-    }
-    document.addEventListener('keydown', this.globalPlaybackKeydownHandler, true)
-
-    this.addEventListener('keydown', event => {
-      if (
-        event.code !== 'Slash' ||
-        !event.metaKey ||
-        event.altKey ||
-        event.ctrlKey
-      ) {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-      this.focusCueSearch()
-    })
-  }
-
-  unbindKeyboardEvents() {
-    if (!this.globalPlaybackKeydownHandler) return
-
-    document.removeEventListener('keydown', this.globalPlaybackKeydownHandler, true)
-    this.globalPlaybackKeydownHandler = null
-  }
-
-  isGlobalPlaybackShortcut(event) {
-    return (
-      event.key === 'Enter' &&
-      event.metaKey &&
-      event.shiftKey &&
-      !event.altKey &&
-      !event.ctrlKey
-    )
-  }
-
-  isCueNavigationShortcut(event) {
-    return (
-      (event.key === 'ArrowDown' || event.key === 'ArrowUp') &&
-      event.metaKey &&
-      event.altKey &&
-      !event.ctrlKey
-    )
-  }
-
-  getKeyboardNavigationCue(event) {
-    const cueEditor = event.target?.closest?.('cue-editor')
-    return cueEditor?.data ?? this.activeCue
   }
 
   focusCueSearch() {
@@ -451,7 +392,7 @@ class CueBert extends HTMLElement {
     })
 
     this.transcriptFile.addEventListener('click', e => {
-      if (!this.canUseNativeTranscriptPicker()) return
+      if (!this.fileController.canUseNativeTranscriptPicker()) return
 
       e.preventDefault()
       this.openNativeTranscriptFile().catch(err => {
@@ -751,31 +692,17 @@ class CueBert extends HTMLElement {
 
 
 
-  canUseNativeTranscriptPicker() {
-    return Boolean(window.__TAURI__?.dialog?.open && window.__TAURI__?.fs?.readTextFile)
-  }
-
-  canFindMatchingMedia() {
-    return Boolean(window.__TAURI__?.core?.invoke && window.__TAURI__?.core?.convertFileSrc)
-  }
-
   async openNativeTranscriptFile() {
-    const selectedPath = await window.__TAURI__.dialog.open({
-      multiple: false,
-      filters: [{ name: 'Transcripts', extensions: ['json'] }]
-    })
-
-    if (!selectedPath || Array.isArray(selectedPath)) return
-
-    const text = await window.__TAURI__.fs.readTextFile(selectedPath)
-    this.loadTranscriptText(text, {
-      fileName: this.getPathFileName(selectedPath),
-      sourcePath: selectedPath
+    const result = await this.fileController.openTranscriptFile()
+    if (!result) return
+    this.loadTranscriptText(result.text, {
+      fileName: this.getPathFileName(result.path),
+      sourcePath: result.path
     })
   }
 
   async loadMatchingMediaForTranscript(transcriptPath) {
-    if (!transcriptPath || !this.canFindMatchingMedia()) return
+    if (!transcriptPath || !this.fileController.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
       if (this.shouldFillGapsWithCurrentAudio()) {
         this.fillAudibleCueGaps()
@@ -784,9 +711,7 @@ class CueBert extends HTMLElement {
     }
     if (this.mediaLoadedFromPath && this.mediaLoadedFromPath !== this.autoLoadedMediaPath) return
 
-    const mediaPath = await window.__TAURI__.core.invoke('find_matching_media', {
-      transcriptPath
-    })
+    const mediaPath = await this.fileController.findMatchingMedia(transcriptPath)
     if (!mediaPath) return
     if (mediaPath === this.mediaLoadedFromPath) {
       if (this.shouldFillGapsWithCurrentAudio()) {
@@ -807,7 +732,7 @@ class CueBert extends HTMLElement {
   }
 
   async loadMediaForTranscript(transcriptPath, sourceData) {
-    if (!this.canFindMatchingMedia()) return
+    if (!this.fileController.canFindMatchingMedia()) return
     if (this.mediaLoadedManually) {
       if (this.shouldFillGapsWithCurrentAudio(sourceData)) {
         this.fillAudibleCueGaps()
@@ -838,55 +763,17 @@ class CueBert extends HTMLElement {
   }
 
   async loadMediaFromPath(mediaPath) {
-    const mediaUrl = window.__TAURI__.core.convertFileSrc(mediaPath)
+    const mediaUrl = this.fileController.convertFileSrc(mediaPath)
 
     this.video.src = mediaUrl
     this.transportController.updateUi()
 
     try {
-      const blob = await this.getMediaAnalysisBlob(mediaPath, mediaUrl)
+      const blob = await this.fileController.getMediaBlob(mediaPath, mediaUrl)
       if (blob) await this.initAudioAnalysis(blob)
     } catch (err) {
       console.warn('Auto-loaded media is playable, but waveform analysis failed:', err)
     }
-  }
-
-  async getMediaAnalysisBlob(mediaPath, mediaUrl) {
-    if (mediaUrl.startsWith('asset://')) {
-      return this.readMediaBlobFromPath(mediaPath)
-    }
-
-    const response = await fetch(mediaUrl)
-    if (!response.ok) throw new Error(`HTTP ${response.status}`)
-    return response.blob()
-  }
-
-  async readMediaBlobFromPath(mediaPath) {
-    const bytes = await window.__TAURI__?.fs?.readFile?.(mediaPath)
-    if (!bytes) return null
-
-    return new Blob([bytes], { type: this.getMediaMimeType(mediaPath) })
-  }
-
-  getMediaMimeType(path) {
-    const extension = path.split('.').pop()?.toLowerCase()
-    const mimeTypes = {
-      aac: 'audio/aac',
-      aiff: 'audio/aiff',
-      avi: 'video/x-msvideo',
-      flac: 'audio/flac',
-      m4a: 'audio/mp4',
-      m4v: 'video/mp4',
-      mkv: 'video/x-matroska',
-      mov: 'video/quicktime',
-      mp3: 'audio/mpeg',
-      mp4: 'video/mp4',
-      ogg: 'audio/ogg',
-      wav: 'audio/wav',
-      webm: 'video/webm'
-    }
-
-    return mimeTypes[extension] || 'application/octet-stream'
   }
 
   getTranscriptMetadataMediaPath(sourceData) {
@@ -1219,30 +1106,7 @@ class CueBert extends HTMLElement {
 
   async saveTextOutput({ defaultPath, filters, contents, mimeType }) {
     try {
-      const tauriDialog = window.__TAURI__?.dialog
-      const tauriFs = window.__TAURI__?.fs
-
-      if (tauriDialog?.save && tauriFs?.writeTextFile) {
-        const targetPath = await tauriDialog.save({
-          defaultPath,
-          filters
-        })
-
-        if (!targetPath) return
-
-        await tauriFs.writeTextFile(targetPath, contents)
-        console.info(`Saved file to ${targetPath}`)
-        return targetPath
-      }
-
-      const blob = new Blob([contents], { type: mimeType })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = defaultPath
-      a.click()
-      URL.revokeObjectURL(url)
-      return null
+      return await this.fileController.saveTextFile({ defaultPath, filters, contents, mimeType })
     } catch (error) {
       console.error('Saving file failed:', error)
       alert(`Saving file failed: ${error?.message ?? error}`)
