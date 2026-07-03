@@ -15,7 +15,7 @@ Create controllers like:
 SubtitleEditor.js              // shell only: compose controllers + state
 controllers/
   MediaController.js            // load media, matching media, MIME/blob logic
-  PreviewTrackController.js     // VTT blob URL, text track listeners
+  PlaybackCueController.js      // cue lookup and playback listeners
   CuePlaybackController.js      // active/playback cue sync
   CueEditingController.js       // split, merge, delete, boundaries
   KeyboardController.js         // global shortcuts

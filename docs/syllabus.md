@@ -90,7 +90,7 @@ Add a temporary `console.log(this.cues)` after transcript loading, load a transc
 
 ### Study Questions
 
-1. How does Cuebert normalize VTT cues and aTrain JSON segments into one editing model?
+1. How does Cuebert normalize JSON transcript segments into one editing model?
 
 2. Why does `sourceSegmentIds` matter after splitting or merging cues?
 
@@ -177,7 +177,7 @@ Trace a waveform boundary drag:
 
 ## 5. Transcript Parsing and Export
 
-Cuebert accepts VTT and JSON-like transcript inputs. Parsing turns source formats into the shared cue model. Export turns the current cue model back into VTT, plain text, or Cuebert/aTrain JSON.
+Cuebert accepts JSON-like transcript inputs. Parsing turns source transcript data into the shared cue model. Export turns the current cue model back into plain text or Cuebert/aTrain JSON.
 
 `TranscriptDocument` is a facade over parsing, export, metadata syncing, and title derivation.
 
@@ -189,27 +189,26 @@ Read:
 - `cuebert/services/TranscriptParser.js`
 - `cuebert/services/TranscriptExporter.js`
 - `cuebert/services/TranscriptDocument.test.js`
-- `cuebert/services/TranscriptExporter.test.js`
 
 ### Lab
 
 Create a tiny test fixture in your head:
 
-```text
-WEBVTT
-
-1
-00:00:00.000 --> 00:00:01.000
-Hello
+```json
+{
+  "segments": [
+    { "id": 1, "start": 0, "end": 1, "text": " Hello" }
+  ]
+}
 ```
 
-Trace how it becomes a cue and how it exports back to VTT.
+Trace how it becomes a cue and how it exports back to Cuebert JSON.
 
 ### Study Questions
 
-1. What data is lost when importing VTT compared with aTrain JSON?
+1. What data is preserved when importing aTrain JSON?
 2. Why does `buildAtrainJson()` clone source segments instead of creating every segment from scratch?
-3. Why does an empty generated gap cue export with a zero-width character in VTT?
+3. Why are generated audio-gap cues omitted from saved transcript JSON?
 
 ## 6. Cue Operations
 
@@ -314,7 +313,7 @@ Explain why gap detection needs both a duration threshold and an audio threshold
 
 Cuebert can run as a browser-like frontend, but desktop functionality depends on Tauri. Tauri provides native file paths, filesystem writes, matching-media discovery, and logging.
 
-Autosave is intentionally conservative. It writes VTT back to the same file, or writes `.cuebert.json` next to a source aTrain JSON file. The Rust command validates that the autosave target is safe.
+Autosave is intentionally conservative. It writes `.cuebert.json` next to a source aTrain JSON file, or overwrites an existing `.cuebert.json` file. The Rust command validates that the autosave target is safe.
 
 ### Reading Assignment
 

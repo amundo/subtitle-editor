@@ -17,7 +17,7 @@ A subtitle file is a sequence of cues. Each cue has:
 - an optional speaker label
 - optional source metadata from the original transcript
 
-Cuebert can load transcript formats such as VTT and aTrain-style JSON, then present those cues as editable blocks. The media file provides playback and waveform context, but the cue list is the primary workspace.
+Cuebert loads aTrain-style JSON transcripts, then presents those cues as editable blocks. The media file provides playback and waveform context, but the cue list is the primary workspace.
 
 ### Try It
 
@@ -170,7 +170,7 @@ Use autosave for ongoing work. Use export when the transcript is ready to leave 
 1. Confirm that autosave is enabled.
 2. Make a small edit.
 3. Export a Cuebert JSON copy.
-4. Export a VTT or TXT version.
+4. Export a TXT version when you need plain text outside Cuebert.
 
 ### Study Questions
 

@@ -331,8 +331,7 @@ loading, load a transcript, and inspect the cue objects. Remove the log
 afterward.</p>
 <h3 id="study-questions-1">Study Questions</h3>
 <ol type="1">
-<li>How does Cuebert normalize VTT cues and aTrain JSON segments into
-one editing model?</li>
+<li>How does Cuebert normalize JSON transcript segments into one editing model?</li>
 <li>Why does <code>sourceSegmentIds</code> matter after splitting or
 merging cues?</li>
 <li>What must happen after mutating <code>this.cues</code>?</li>
@@ -431,9 +430,7 @@ state?</li>
 </ol>
 <h2 id="transcript-parsing-and-export">5. Transcript Parsing and
 Export</h2>
-<p>Cuebert accepts VTT and JSON-like transcript inputs. Parsing turns
-source formats into the shared cue model. Export turns the current cue
-model back into VTT, plain text, or Cuebert/aTrain JSON.</p>
+<p>Cuebert accepts JSON-like transcript inputs. Parsing turns source transcript data into the shared cue model. Export turns the current cue model back into plain text or Cuebert/aTrain JSON.</p>
 <p><code>TranscriptDocument</code> is a facade over parsing, export,
 metadata syncing, and title derivation.</p>
 <h3 id="reading-assignment-4">Reading Assignment</h3>
@@ -443,23 +440,21 @@ metadata syncing, and title derivation.</p>
 <li><code>cuebert/services/TranscriptParser.js</code></li>
 <li><code>cuebert/services/TranscriptExporter.js</code></li>
 <li><code>cuebert/services/TranscriptDocument.test.js</code></li>
-<li><code>cuebert/services/TranscriptExporter.test.js</code></li>
 </ul>
 <h3 id="lab-4">Lab</h3>
 <p>Create a tiny test fixture in your head:</p>
-<pre class="text"><code>WEBVTT
-
-1
-00:00:00.000 --&gt; 00:00:01.000
-Hello</code></pre>
-<p>Trace how it becomes a cue and how it exports back to VTT.</p>
+<pre class="json"><code>{
+  &quot;segments&quot;: [
+    { &quot;id&quot;: 1, &quot;start&quot;: 0, &quot;end&quot;: 1, &quot;text&quot;: &quot; Hello&quot; }
+  ]
+}</code></pre>
+<p>Trace how it becomes a cue and how it exports back to Cuebert JSON.</p>
 <h3 id="study-questions-4">Study Questions</h3>
 <ol type="1">
-<li>What data is lost when importing VTT compared with aTrain JSON?</li>
+<li>What data is preserved when importing aTrain JSON?</li>
 <li>Why does <code>buildAtrainJson()</code> clone source segments
 instead of creating every segment from scratch?</li>
-<li>Why does an empty generated gap cue export with a zero-width
-character in VTT?</li>
+<li>Why are generated audio-gap cues omitted from saved transcript JSON?</li>
 </ol>
 <h2 id="cue-operations">6. Cue Operations</h2>
 <p>Structural edits are isolated in <code>CueOperations.js</code>:</p>
@@ -569,10 +564,7 @@ and Tauri</h2>
 <p>Cuebert can run as a browser-like frontend, but desktop functionality
 depends on Tauri. Tauri provides native file paths, filesystem writes,
 matching-media discovery, and logging.</p>
-<p>Autosave is intentionally conservative. It writes VTT back to the
-same file, or writes <code>.cuebert.json</code> next to a source aTrain
-JSON file. The Rust command validates that the autosave target is
-safe.</p>
+<p>Autosave is intentionally conservative. It writes <code>.cuebert.json</code> next to a source aTrain JSON file, or overwrites an existing <code>.cuebert.json</code> file. The Rust command validates that the autosave target is safe.</p>
 <h3 id="reading-assignment-8">Reading Assignment</h3>
 <p>Read:</p>
 <ul>
