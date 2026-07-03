@@ -95,6 +95,10 @@
     "transcribe:zip": {
       "description": "Build and zip the Cuebert transcription kit for AirDrop",
       "command": "deno task transcribe:package && rm -f cuebert-transcription-kit.zip && zip -r cuebert-transcription-kit.zip cuebert-transcription-kit"
+    },
+    "test": {
+      "description": "Run all service unit tests",
+      "command": "deno test cuebert/services/ --allow-read"
     }
   }
 }
