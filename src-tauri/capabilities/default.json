@@ -8,6 +8,7 @@
   "permissions": [
     "core:default",
     "dialog:default",
+    "dialog:allow-confirm",
     "fs:default",
     "fs:read-files",
     "fs:allow-read-text-file",

@@ -1,5 +1,5 @@
 import { parseSubtitleFile } from './TranscriptParser.js'
-import { buildAtrainJson, buildPlainText, buildVtt } from './TranscriptExporter.js'
+import { buildAtrainJson, buildPlainText } from './TranscriptExporter.js'
 
 class TranscriptDocument {
   parseText(text, { fileName = '', sourcePath = null } = {}) {
@@ -30,10 +30,6 @@ class TranscriptDocument {
       return `${JSON.stringify(json, null, 2)}\n`
     }
 
-    if (format === 'vtt') {
-      return buildVtt(cues)
-    }
-
     throw new Error(`Transcript contents are not available for ${format}`)
   }
 
@@ -52,10 +48,6 @@ class TranscriptDocument {
     })
     const contents = JSON.stringify(json, null, 2)
     return trailingNewline ? `${contents}\n` : contents
-  }
-
-  buildVttContents(cues) {
-    return buildVtt(cues)
   }
 
   buildPlainTextContents(cues) {

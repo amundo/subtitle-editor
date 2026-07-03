@@ -30,8 +30,6 @@ class CueBert extends HTMLElement {
 
     // preview/playback state
     this.previewEnd = null
-    this.previewTrackUrl = null
-    this.previewTrackRefreshTimer = null
 
     // display preferences
     this.cueFontSizeEm = 1
@@ -73,7 +71,6 @@ class CueBert extends HTMLElement {
     this.cueElementByCue = new Map()
     this.playbackCue = null
     this.playbackCueElement = null
-    this.previewCueListeners = []
     this.transportPlaybackHighlightActive = false
     this.globalPlaybackKeydownHandler = null
     this.keyboardFocusedCue = null
@@ -102,9 +99,6 @@ class CueBert extends HTMLElement {
   disconnectedCallback() {
     this.unbindKeyboardEvents()
     this.cancelScheduledAutosave()
-    this.cancelScheduledPreviewTrackRefresh()
-    this.clearPreviewCueListeners()
-    this.revokePreviewTrackUrl()
   }
 
   renderShell() {
@@ -118,7 +112,7 @@ class CueBert extends HTMLElement {
             </label>
             <label class="file-load-button">
               <span>Load transcript</span>
-              <input class="visually-hidden-file" type="file" data-role="vttFile" accept=".json,.vtt,application/json,text/vtt">
+              <input class="visually-hidden-file" type="file" data-role="transcriptFile" accept=".json,application/json">
             </label>
           </span>
         </header>
@@ -141,7 +135,6 @@ class CueBert extends HTMLElement {
               Export:
               <button data-role="saveBtn" disabled>Cuebert JSON</button>
               <button data-role="downloadTextBtn" disabled>TXT</button>
-              <button data-role="downloadBtn" disabled>VTT</button>
             </div>
           </div>
           <div class="cue-search-row" data-role="cueSearchRow">
@@ -176,13 +169,6 @@ class CueBert extends HTMLElement {
 
         <footer class="media-bar">
           <video data-role="video" preload="metadata" aria-hidden="true" tabindex="-1">
-            <track
-              data-role="previewTrack"
-              kind="subtitles"
-              srclang="en"
-              label="Edited subtitles"
-              default
-            >
           </video>
           <div class="transport-controls" role="group" aria-label="Media playback controls">
             <button data-role="mediaPlayBtn" class="transport-button" type="button" aria-label="Play">▶</button>
@@ -310,7 +296,6 @@ class CueBert extends HTMLElement {
   bindEvents() {
     this.transportController = new TransportController({
       video: this.video,
-      previewTrack: this.previewTrack,
       controls: {
         currentTimeLabel: this.currentTimeLabel,
         durationTimeLabel: this.durationTimeLabel,
@@ -327,10 +312,6 @@ class CueBert extends HTMLElement {
       },
       onPlaybackSync: source => {
         this.syncActiveCueToPlayback(source)
-      },
-      onPreviewTrackLoad: () => {
-        this.ensurePreviewTrackShowing()
-        this.bindPreviewCueEvents()
       }
     })
     this.transportController.bindVideoEvents()
@@ -461,7 +442,6 @@ class CueBert extends HTMLElement {
       this.mediaLoadedManually = true
       this.video.src = URL.createObjectURL(file)
       this.transportController.updateUi()
-      this.ensurePreviewTrackShowing()
       // kick off async audio analysis
       this.initAudioAnalysis(file).catch(err => {
         console.error('Audio analysis failed:', err)
@@ -470,7 +450,7 @@ class CueBert extends HTMLElement {
       this.updateMediaLoadControlVisibility()
     })
 
-    this.vttFile.addEventListener('click', e => {
+    this.transcriptFile.addEventListener('click', e => {
       if (!this.canUseNativeTranscriptPicker()) return
 
       e.preventDefault()
@@ -480,7 +460,7 @@ class CueBert extends HTMLElement {
       })
     })
 
-    this.vttFile.addEventListener('change', e => {
+    this.transcriptFile.addEventListener('change', e => {
       const file = e.target.files[0]
       if (!file) return
       file.text().then(text => {
@@ -497,19 +477,6 @@ class CueBert extends HTMLElement {
 
   }
   bindExportEvents() {
-    this.downloadBtn.addEventListener('click', () => {
-      this.saveTextOutput({
-        defaultPath: 'adjusted-subtitles.vtt',
-        filters: [{ name: 'WebVTT', extensions: ['vtt'] }],
-        contents: this.transcriptDocument.buildVttContents(this.cues),
-        mimeType: 'text/vtt'
-      }).then(targetPath => {
-        if (targetPath && this.loadedTranscriptFormat === 'vtt') {
-          this.markSavedToPath(targetPath)
-        }
-      })
-    })
-
     this.saveBtn.addEventListener('click', () => {
       if (this.loadedTranscriptFormat !== 'atrain-json' || !this.loadedTranscript) return
 
@@ -795,7 +762,7 @@ class CueBert extends HTMLElement {
   async openNativeTranscriptFile() {
     const selectedPath = await window.__TAURI__.dialog.open({
       multiple: false,
-      filters: [{ name: 'Transcripts', extensions: ['json', 'vtt'] }]
+      filters: [{ name: 'Transcripts', extensions: ['json'] }]
     })
 
     if (!selectedPath || Array.isArray(selectedPath)) return
@@ -875,7 +842,6 @@ class CueBert extends HTMLElement {
 
     this.video.src = mediaUrl
     this.transportController.updateUi()
-    this.ensurePreviewTrackShowing()
 
     try {
       const blob = await this.getMediaAnalysisBlob(mediaPath, mediaUrl)
@@ -957,12 +923,10 @@ class CueBert extends HTMLElement {
       this.fillAudibleCueGaps()
     }
     this.renderCues()
-    this.refreshPreviewTrack()
     this.loadMediaForTranscript(sourcePath, document.sourceData).catch(err => {
       console.warn('Transcript media load failed:', err)
     })
     this.saveBtn.disabled = document.format !== 'atrain-json'
-    this.downloadBtn.disabled = false
     this.downloadTextBtn.disabled = false
     this.updateMediaLoadControlVisibility(document.sourceData)
     window.cuebertLog?.('info', 'loaded-transcript', {
@@ -996,43 +960,9 @@ class CueBert extends HTMLElement {
     )
   }
 
-  refreshPreviewTrack() {
-    if (!this.previewTrack) return
-    this.previewTrackRefreshTimer = null
-
-    this.clearPreviewCueListeners()
-    const vtt = this.transcriptDocument.buildVttContents(this.cues)
-    const nextUrl = URL.createObjectURL(new Blob([vtt], { type: 'text/vtt' }))
-    const previousUrl = this.previewTrackUrl
-
-    this.previewTrackUrl = nextUrl
-    this.previewTrack.src = nextUrl
-    this.ensurePreviewTrackShowing()
-
-    if (previousUrl) {
-      URL.revokeObjectURL(previousUrl)
-    }
-  }
-
-  schedulePreviewTrackRefresh() {
-    if (this.previewTrackRefreshTimer) return
-
-    this.previewTrackRefreshTimer = window.setTimeout(() => {
-      this.refreshPreviewTrack()
-    }, 250)
-  }
-
-  cancelScheduledPreviewTrackRefresh() {
-    if (!this.previewTrackRefreshTimer) return
-
-    window.clearTimeout(this.previewTrackRefreshTimer)
-    this.previewTrackRefreshTimer = null
-  }
-
   markDirty() {
     this.hasUnsavedChanges = true
     this.changeRevision++
-    this.schedulePreviewTrackRefresh()
     this.scheduleAutosave()
     this.updateAutosaveStatus()
   }
@@ -1287,20 +1217,6 @@ class CueBert extends HTMLElement {
     })
   }
 
-  ensurePreviewTrackShowing() {
-    const previewTextTrack = this.video?.textTracks?.[0]
-    if (previewTextTrack) {
-      previewTextTrack.mode = 'showing'
-    }
-  }
-
-  revokePreviewTrackUrl() {
-    if (this.previewTrackUrl) {
-      URL.revokeObjectURL(this.previewTrackUrl)
-      this.previewTrackUrl = null
-    }
-  }
-
   async saveTextOutput({ defaultPath, filters, contents, mimeType }) {
     try {
       const tauriDialog = window.__TAURI__?.dialog
@@ -1498,7 +1414,7 @@ class CueBert extends HTMLElement {
       return
     }
 
-    if (source === 'cue-preview' || source === 'trackload') {
+    if (source === 'cue-preview') {
       this.transportPlaybackHighlightActive = false
       this.clearPlaybackCue(null, source)
     }
@@ -1529,40 +1445,6 @@ class CueBert extends HTMLElement {
     this.cueList?.cueElementByCue?.forEach(cueEditor => {
       cueEditor.updatePlayhead?.(playheadTime)
     })
-  }
-
-  bindPreviewCueEvents() {
-    this.clearPreviewCueListeners()
-
-    const textTrack = this.previewTrack?.track
-    const trackCues = textTrack?.cues ? Array.from(textTrack.cues) : []
-    if (!trackCues.length) return
-
-    trackCues.forEach((trackCue, index) => {
-      const cue = this.cues[index]
-      if (!cue) return
-
-      const onEnter = () => {
-        if (this.previewEnd !== null) return
-        this.syncActiveCueToPlayback('texttrack-enter')
-      }
-      const onExit = () => {
-        this.clearPlaybackCue(cue, 'texttrack-exit')
-        this.syncActiveCueToPlayback('texttrack-exit')
-      }
-
-      trackCue.addEventListener('enter', onEnter)
-      trackCue.addEventListener('exit', onExit)
-      this.previewCueListeners.push({ trackCue, onEnter, onExit })
-    })
-  }
-
-  clearPreviewCueListeners() {
-    this.previewCueListeners.forEach(({ trackCue, onEnter, onExit }) => {
-      trackCue.removeEventListener('enter', onEnter)
-      trackCue.removeEventListener('exit', onExit)
-    })
-    this.previewCueListeners = []
   }
 
   getUniqueSpeakers() {

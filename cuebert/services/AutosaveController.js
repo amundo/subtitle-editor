@@ -45,7 +45,6 @@ class AutosaveController {
 
   getTargetPath({ loadedTranscriptPath, loadedTranscriptFormat }) {
     if (!loadedTranscriptPath) return null
-    if (loadedTranscriptFormat === 'vtt') return loadedTranscriptPath
     if (loadedTranscriptFormat !== 'atrain-json') return null
     if (this.isCuebertJsonPath(loadedTranscriptPath)) return loadedTranscriptPath
 

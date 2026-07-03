@@ -1,5 +1,3 @@
-import { parseTime } from './time.js'
-
 function parseSubtitleFile(text, fileName = '') {
   const trimmed = text.trimStart()
   const looksLikeJson =
@@ -8,68 +6,16 @@ function parseSubtitleFile(text, fileName = '') {
     trimmed.startsWith('[')
 
   if (looksLikeJson) {
-    try {
-      const parsed = JSON.parse(text)
-      if (isWhisperCppJson(parsed)) {
-        const sourceData = parseWhisperCpp(parsed)
-        return parseAtrainJson(sourceData, { preferSegmentTiming: true })
-      }
-
-      return parseAtrainJson(parsed)
-    } catch (err) {
-      if (!trimmed.startsWith('WEBVTT')) throw err
-    }
-  }
-
-  return {
-    format: 'vtt',
-    cues: parseVtt(text),
-    sourceData: null
-  }
-}
-
-function parseVtt(text) {
-  const lines = text.replace(/\r/g, '').split('\n')
-  const cues = []
-  let i = 0
-
-  while (i < lines.length) {
-    const line = lines[i].trim()
-    i++
-
-    if (!line || line.startsWith('WEBVTT')) continue
-
-    let id = null
-    let timeLine = line
-
-    if (!line.includes('-->')) {
-      id = line
-      timeLine = (lines[i++] || '').trim()
+    const parsed = JSON.parse(text)
+    if (isWhisperCppJson(parsed)) {
+      const sourceData = parseWhisperCpp(parsed)
+      return parseAtrainJson(sourceData, { preferSegmentTiming: true })
     }
 
-    const m = timeLine.match(/([\d:.]+)\s*-->\s*([\d:.]+)/)
-    if (!m) continue
-
-    const start = parseTime(m[1])
-    const end = parseTime(m[2])
-
-    const textLines = []
-
-    while (i < lines.length && lines[i].trim() !== '') {
-      textLines.push(lines[i++])
-    }
-
-    const cueText = textLines.join('\n')
-
-    cues.push({
-      id: id ?? cues.length + 1,
-      start,
-      end,
-      text: cueText
-    })
+    return parseAtrainJson(parsed)
   }
 
-  return cues
+  throw new Error('Cuebert only supports JSON transcript files.')
 }
 
 function parseWhisperCpp(text, {
@@ -459,7 +405,6 @@ function averageProbabilities(a, b) {
 
 export {
   parseSubtitleFile,
-  parseVtt,
   parseWhisperCpp,
   parseAtrainJson
 }

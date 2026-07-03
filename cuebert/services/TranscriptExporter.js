@@ -1,18 +1,3 @@
-import { formatTime } from './time.js'
-
-function buildVtt(cues) {
-  const parts = ['WEBVTT\n']
-  for (const cue of cues) {
-    parts.push(String(cue.id))
-    parts.push(
-      `${formatTime(cue.start)} --> ${formatTime(cue.end)}`
-    )
-    parts.push(formatCueTextForExport(cue))
-    parts.push('')
-  }
-  return parts.join('\n')
-}
-
 function buildPlainText(cues) {
   const parts = []
   let previousSpeaker = null
@@ -111,16 +96,6 @@ function buildAtrainJson(cues, sourceData, {
 }
 
 
-function formatCueTextForExport(cue) {
-  const text = (cue.text || '').trim()
-  const speaker = typeof cue.speaker === 'string' ? cue.speaker.trim() : ''
-  if (!text && cue.generatedFromAudioGap) return '\u200B'
-  if (!speaker || !text) return text
-
-  const speakerPrefix = `[${speaker}] `
-  return text.startsWith(speakerPrefix) ? text : `${speakerPrefix}${text}`
-}
-
 function getCueSourceSegmentIds(cue) {
   if (Array.isArray(cue.sourceSegmentIds) && cue.sourceSegmentIds.length) {
     return cue.sourceSegmentIds
@@ -130,9 +105,7 @@ function getCueSourceSegmentIds(cue) {
 }
 
 export {
-  buildVtt,
   buildPlainText,
   buildAtrainJson,
-  formatCueTextForExport,
   getCueSourceSegmentIds
 }

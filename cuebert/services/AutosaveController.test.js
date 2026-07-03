@@ -29,7 +29,7 @@ Deno.test('AutosaveController targets a sibling Cuebert JSON for aTrain JSON', (
   )
 })
 
-Deno.test('AutosaveController preserves existing Cuebert JSON and VTT targets', () => {
+Deno.test('AutosaveController preserves existing Cuebert JSON targets', () => {
   const controller = createController()
 
   assertEquals(
@@ -41,10 +41,10 @@ Deno.test('AutosaveController preserves existing Cuebert JSON and VTT targets', 
   )
   assertEquals(
     controller.getTargetPath({
-      loadedTranscriptPath: '/tmp/subtitles.vtt',
-      loadedTranscriptFormat: 'vtt'
+      loadedTranscriptPath: '/tmp/subtitles.srt',
+      loadedTranscriptFormat: 'srt'
     }),
-    '/tmp/subtitles.vtt'
+    null
   )
 })
 

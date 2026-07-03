@@ -14,7 +14,7 @@
     },
     "build:debug": {
       "description": "Build debug version of Tauri app",
-      "command": "deno task tauri build --debug"
+      "command": "deno run --allow-read --allow-write --allow-run scripts/build-debug.js"
     },
     "build:all": {
       "description": "Build release and debug DMGs",

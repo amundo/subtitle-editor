@@ -14,6 +14,8 @@ use tauri::{
 const LOG_FILE_NAME: &str = "cuebert.log";
 const TRANSCRIPTION_SETUP_GUIDE_MENU_ID: &str = "transcription_setup_guide";
 const TRANSCRIPTION_SETUP_GUIDE_WINDOW_LABEL: &str = "transcription-setup-guide";
+const CRASH_LOG_HELP_MENU_ID: &str = "crash_log_help";
+const CRASH_LOG_HELP_WINDOW_LABEL: &str = "crash-log-help";
 
 fn fallback_log_dir() -> PathBuf {
     if cfg!(target_os = "macos") {
@@ -98,13 +100,6 @@ fn is_cuebert_json_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-fn is_vtt_path(path: &Path) -> bool {
-    path.extension()
-        .and_then(|extension| extension.to_str())
-        .map(|extension| extension.eq_ignore_ascii_case("vtt"))
-        .unwrap_or(false)
-}
-
 #[tauri::command]
 fn write_transcript_autosave(
     source_path: String,
@@ -136,9 +131,9 @@ fn write_transcript_autosave(
     }
 
     if target_path == source_path {
-        if !is_cuebert_json_path(&target_path) && !is_vtt_path(&target_path) {
+        if !is_cuebert_json_path(&target_path) {
             return Err(format!(
-                "autosave can only overwrite .cuebert.json or .vtt transcripts: {}",
+                "autosave can only overwrite .cuebert.json transcripts: {}",
                 target_path.display()
             ));
         }
@@ -162,10 +157,18 @@ fn install_app_menu(app: &tauri::App) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
+    let crash_log_help_item = MenuItem::with_id(
+        app.handle(),
+        CRASH_LOG_HELP_MENU_ID,
+        "Crash and Log Help",
+        true,
+        None::<&str>,
+    )?;
 
     if let Some(item) = menu.get(HELP_SUBMENU_ID) {
         if let Some(help_menu) = item.as_submenu() {
             help_menu.append(&setup_guide_item)?;
+            help_menu.append(&crash_log_help_item)?;
         }
     }
 
@@ -198,6 +201,39 @@ fn open_transcription_setup_guide(app: tauri::AppHandle) {
             "level": "error",
             "source": "rust",
             "message": "failed to open transcription setup guide",
+            "error": error.to_string(),
+          },
+        });
+
+        let _ = append_log_line(fallback_log_dir(), &line.to_string());
+    }
+}
+
+fn open_crash_log_help(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window(CRASH_LOG_HELP_WINDOW_LABEL) {
+        let _ = window.show();
+        let _ = window.set_focus();
+        return;
+    }
+
+    let result = WebviewWindowBuilder::new(
+        &app,
+        CRASH_LOG_HELP_WINDOW_LABEL,
+        WebviewUrl::App("help/crash-logs.html".into()),
+    )
+    .title("Crash and Log Help")
+    .inner_size(900.0, 760.0)
+    .min_inner_size(640.0, 520.0)
+    .resizable(true)
+    .build();
+
+    if let Err(error) = result {
+        let line = serde_json::json!({
+          "timestamp_ms": now_millis(),
+          "entry": {
+            "level": "error",
+            "source": "rust",
+            "message": "failed to open crash and log help",
             "error": error.to_string(),
           },
         });
@@ -246,6 +282,11 @@ fn main() {
                 let app = app.clone();
                 std::thread::spawn(move || {
                     open_transcription_setup_guide(app);
+                });
+            } else if event.id() == CRASH_LOG_HELP_MENU_ID {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    open_crash_log_help(app);
                 });
             }
         })

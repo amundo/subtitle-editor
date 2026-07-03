@@ -1,10 +1,10 @@
 ---
 title: Cuebert
 author: Patrick Hall
-description: Cuebert is a web-based subtitle editing tool for transcribing VTT files from audio or video.
+description: Cuebert is a web-based subtitle editing tool for reviewing JSON transcripts from audio or video.
 ---
 
-This is an exprimental UI for editing subtitles (VTT format) directly from media. 
+This is an exprimental UI for editing subtitle cues from JSON transcripts directly alongside media. 
 
 ## Background
 
@@ -20,7 +20,7 @@ Rather than using a single global waveform to represent the whole media file, an
 
 ## Technical details
 
-This tool is a web application built with Web Standards. As of now, there is no server code; the app is entirely client-side. The media file is loaded directly into the browser, and the VTT file is also loaded directly into the browser. The app then processes the media file to create waveforms for each cue, and displays them alongside the text of each cue for editing.
+This tool is a web application built with Web Standards. As of now, there is no server code; the app is entirely client-side. The media file and JSON transcript are loaded directly into the browser. The app then processes the media file to create waveforms for each cue, and displays them alongside the text of each cue for editing.
 
 ## Desktop wrapper
 

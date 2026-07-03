@@ -3,20 +3,16 @@ import { formatTime } from './time.js'
 class TransportController {
   constructor({
     video,
-    previewTrack = null,
     controls = {},
     getPreviewEnd = () => null,
     setPreviewEnd = () => {},
-    onPlaybackSync = () => {},
-    onPreviewTrackLoad = () => {}
+    onPlaybackSync = () => {}
   } = {}) {
     this.video = video
-    this.previewTrack = previewTrack
     this.controls = controls
     this.getPreviewEnd = getPreviewEnd
     this.setPreviewEnd = setPreviewEnd
     this.onPlaybackSync = onPlaybackSync
-    this.onPreviewTrackLoad = onPreviewTrackLoad
     this.playRequestId = 0
     this.playbackRequested = false
     this.previewRange = null
@@ -54,11 +50,6 @@ class TransportController {
     this.video.addEventListener('pause', () => {
       this.playbackRequested = false
       this.updateUi()
-    })
-
-    this.previewTrack?.addEventListener('load', () => {
-      this.onPreviewTrackLoad()
-      this.onPlaybackSync('trackload')
     })
   }
 
