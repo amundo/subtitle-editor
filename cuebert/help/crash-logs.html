@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crash and Log Help</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c2430;
+      --muted: #5b6573;
+      --line: #d8dee8;
+      --panel: #f6f8fb;
+      --accent: #0b6f68;
+      --code-bg: #17202b;
+      --code-ink: #f3f7fb;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: #ffffff;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+
+    main {
+      width: min(820px, calc(100% - 40px));
+      margin: 0 auto;
+      padding: 36px 0 48px;
+    }
+
+    h1,
+    h2,
+    h3 {
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: 2rem;
+    }
+
+    h2 {
+      margin: 34px 0 12px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 1.25rem;
+    }
+
+    h3 {
+      margin: 22px 0 8px;
+      font-size: 1rem;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    ol,
+    ul {
+      margin: 0 0 18px;
+      padding-left: 1.45rem;
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.94em;
+    }
+
+    pre {
+      margin: 10px 0 18px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      border-radius: 8px;
+      color: var(--code-ink);
+      background: var(--code-bg);
+    }
+
+    pre code {
+      font-size: 0.9rem;
+      white-space: pre;
+    }
+
+    .intro {
+      color: var(--muted);
+      font-size: 1.02rem;
+    }
+
+    .note {
+      margin: 18px 0;
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--accent);
+      border-radius: 8px;
+      background: var(--panel);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Crash and Log Help</h1>
+    <p class="intro">
+      If Cuebert crashes or behaves unexpectedly, send the app log and the
+      newest macOS crash report. These files help identify what happened.
+    </p>
+
+    <h2>Find the Cuebert App Log</h2>
+    <ol>
+      <li>Open Finder.</li>
+      <li>Choose <strong>Go</strong> &gt; <strong>Go to Folder...</strong>.</li>
+      <li>Paste this location and press Return:</li>
+    </ol>
+    <pre><code>~/Library/Logs/Cuebert</code></pre>
+    <ol start="4">
+      <li>Attach the file named <code>cuebert.log</code>.</li>
+    </ol>
+
+    <div class="note">
+      If the folder is empty, open Cuebert again, reproduce the problem if you
+      can, then check the folder again.
+    </div>
+
+    <h2>Find the macOS Crash Report</h2>
+    <ol>
+      <li>Open Finder.</li>
+      <li>Choose <strong>Go</strong> &gt; <strong>Go to Folder...</strong>.</li>
+      <li>Paste this location and press Return:</li>
+    </ol>
+    <pre><code>~/Library/Logs/DiagnosticReports</code></pre>
+    <ol start="4">
+      <li>Search for <code>Cuebert</code>.</li>
+      <li>Sort by <strong>Date Modified</strong>.</li>
+      <li>Attach the newest file that starts with <code>Cuebert</code>.</li>
+    </ol>
+
+    <p>
+      The crash report may end in <code>.ips</code> or <code>.crash</code>.
+      Either one is useful.
+    </p>
+
+    <h2>Send the Files</h2>
+    <p>
+      Send these files together:
+    </p>
+    <pre><code>cuebert.log
+the newest Cuebert crash report</code></pre>
+
+    <p>
+      Include a short note about what you were doing just before the crash, and
+      whether the crash happens every time or only sometimes.
+    </p>
+
+    <h2>If Cuebert Will Not Open</h2>
+    <p>
+      You can still use Finder to collect the same files. The log and crash
+      report locations are outside the app, so they remain available after a
+      crash.
+    </p>
+  </main>
+</body>
+</html>
