@@ -1,6 +1,6 @@
 [package]
 name = "cuebert"
-version = "0.8.1"
+version = "0.8.2"
 description = "Cuebert desktop app"
 authors = ["Patrick Hall"]
 edition = "2021"
