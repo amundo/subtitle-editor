@@ -64,6 +64,10 @@
       "description": "Update app version in config files",
       "command": "deno run --allow-read --allow-write scripts/bump-version.js"
     },
+    "release": {
+      "description": "Bump version, build DMGs, tag, push, and create a GitHub release",
+      "command": "deno run --allow-read --allow-write --allow-run scripts/release.js"
+    },
     "transcribe": {
       "description": "Run whisper.cpp and create Cuebert-loadable JSON",
       "command": "deno run --allow-run --allow-read --allow-write --allow-env=HOME,WHISPER_CPP_BIN,WHISPER_CPP_MODEL,WHISPER_CPP_VAD_MODEL scripts/cuebert-transcribe.js"

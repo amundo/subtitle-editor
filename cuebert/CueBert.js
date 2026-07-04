@@ -6,6 +6,7 @@ import { AutosaveController } from './services/AutosaveController.js'
 import { buildEnvelope, getAudibleCueGaps, hasSoundAroundBoundary } from './services/AudioAnalyzer.js'
 import { FileController } from './services/FileController.js'
 import { KeyboardController } from './services/KeyboardController.js'
+import { PreviewTrackController } from './services/PreviewTrackController.js'
 import { SpeakerController } from './services/SpeakerController.js'
 import { TranscriptDocument } from './services/TranscriptDocument.js'
 import { getCueSourceSegmentIds } from './services/TranscriptExporter.js'
@@ -66,15 +67,12 @@ class CueBert extends HTMLElement {
     this.frameDuration = null
     this.filledAudibleGapsSignature = ''
     this.reflowedAudioBoundariesSignature = ''
-    this.lastWaveformPlayheadTime = null
 
     // cue focus/playback UI state
     this.activeCue = null
     this.activeCueElement = null
     this.cueElementByCue = new Map()
-    this.playbackCue = null
-    this.playbackCueElement = null
-    this.transportPlaybackHighlightActive = false
+    this.previewTrack = null
     this.keyboardController = null
     this.keyboardFocusedCue = null
   }
@@ -314,8 +312,22 @@ class CueBert extends HTMLElement {
         this.previewEnd = previewEnd
       },
       onPlaybackSync: source => {
-        this.syncActiveCueToPlayback(source)
+        this.previewTrack.sync(source)
       }
+    })
+    this.previewTrack = new PreviewTrackController({
+      getVideo: () => this.video,
+      getCues: () => this.cues,
+      getCueElement: cue => (
+        this.cueList.ensureCueRendered?.(cue) ??
+        this.cueList.cueElementByCue?.get(cue) ??
+        this.cueElementByCue.get(cue)
+      ),
+      hasCueElement: cue => Boolean(this.cueList.cueElementByCue?.has(cue)),
+      forEachCueElement: fn => this.cueList?.cueElementByCue?.forEach(fn),
+      getPreviewEnd: () => this.previewEnd,
+      onSetActiveCue: (cue, element, options) => this.setActiveCue(cue, element, options),
+      onDispatch: event => this.dispatchEvent(event)
     })
     this.transportController.bindVideoEvents()
     this.bindFileEvents()
@@ -354,7 +366,7 @@ class CueBert extends HTMLElement {
   }
 
   clearCueSearch({ keepCueInContext = false } = {}) {
-    const contextCue = this.activeCue ?? this.playbackCue
+    const contextCue = this.activeCue ?? this.previewTrack.playbackCue
 
     this.cueSearchQuery = ''
     if (this.cueSearchInput) this.cueSearchInput.value = ''
@@ -1149,168 +1161,6 @@ class CueBert extends HTMLElement {
     this.focusCueText(nextCue, { scroll: true, scrollBehavior: 'auto' })
   }
 
-  setPlaybackCue(cue, source = 'playback', options = {}) {
-    if (this.playbackCue === cue) {
-      this.ensurePlaybackCueElement(cue, options)
-      return
-    }
-
-    const previousCue = this.playbackCue
-    if (this.playbackCueElement) {
-      this.playbackCueElement.classList.remove('is-playback-active')
-    }
-    this.playbackCueElement = null
-    this.playbackCue = cue
-    if (previousCue) {
-      this.dispatchEvent(new CustomEvent('cueend', {
-        detail: { cue: previousCue, source },
-        bubbles: true
-      }))
-    }
-    if (!cue) return
-
-    const element = this.cueList.ensureCueRendered?.(cue) ??
-      this.cueList.cueElementByCue?.get(cue) ??
-      this.cueElementByCue.get(cue)
-    if (!element) return
-
-    this.playbackCueElement = element
-    element.classList.add('is-playback-active')
-    this.dispatchEvent(new CustomEvent('cuestart', {
-      detail: { cue, source },
-      bubbles: true
-    }))
-    this.setActiveCue(cue, element, { scroll: options.scroll })
-  }
-
-  ensurePlaybackCueElement(cue, options = {}) {
-    if (!cue) return
-
-    const currentElementStillRendered = (
-      this.playbackCueElement &&
-      this.playbackCueElement.isConnected &&
-      this.playbackCueElement.data === cue
-    )
-
-    if (currentElementStillRendered) {
-      this.playbackCueElement.classList.add('is-playback-active')
-      return
-    }
-
-    const element = this.cueList.ensureCueRendered?.(cue) ??
-      this.cueList.cueElementByCue?.get(cue) ??
-      this.cueElementByCue.get(cue)
-    if (!element) return
-
-    this.playbackCueElement = element
-    element.classList.add('is-playback-active')
-    this.setActiveCue(cue, element, { scroll: options.scroll })
-  }
-
-  clearPlaybackCue(cue, source = 'playback') {
-    if (cue && this.playbackCue !== cue) return
-
-    const endedCue = this.playbackCue
-    if (this.playbackCueElement) {
-      this.playbackCueElement.classList.remove('is-playback-active')
-    }
-    this.playbackCue = null
-    this.playbackCueElement = null
-
-    if (endedCue) {
-      this.dispatchEvent(new CustomEvent('cueend', {
-        detail: { cue: endedCue, source },
-        bubbles: true
-      }))
-    }
-  }
-
-  syncActiveCueToPlayback(source = 'playback') {
-    this.updateTransportPlaybackHighlightState(source)
-    if (!this.video || this.previewEnd !== null) return
-    this.updateRenderedWaveformPlayheads()
-    if (this.video.paused && source !== 'transport-seek') return
-    if (!this.transportPlaybackHighlightActive) return
-
-    const currentCue = this.findCueAtTime(this.video.currentTime)
-    if (currentCue) {
-      if (
-        source === 'transport-seek-preview' &&
-        !this.cueList.cueElementByCue?.has(currentCue)
-      ) {
-        this.setPlaybackCueReference(currentCue, source)
-        return
-      }
-
-      this.setPlaybackCue(currentCue, source, {
-        scroll: source !== 'transport-seek-preview'
-      })
-    } else {
-      this.clearPlaybackCue(null, source)
-    }
-  }
-
-  setPlaybackCueReference(cue, source = 'playback') {
-    if (this.playbackCue === cue) return
-
-    const previousCue = this.playbackCue
-    if (this.playbackCueElement) {
-      this.playbackCueElement.classList.remove('is-playback-active')
-    }
-    this.playbackCue = cue
-    this.playbackCueElement = null
-
-    if (previousCue) {
-      this.dispatchEvent(new CustomEvent('cueend', {
-        detail: { cue: previousCue, source },
-        bubbles: true
-      }))
-    }
-  }
-
-  updateTransportPlaybackHighlightState(source) {
-    if (
-      source === 'transport-play' ||
-      source === 'transport-seek' ||
-      source === 'transport-seek-preview'
-    ) {
-      this.transportPlaybackHighlightActive = true
-      return
-    }
-
-    if (source === 'cue-preview') {
-      this.transportPlaybackHighlightActive = false
-      this.clearPlaybackCue(null, source)
-    }
-  }
-
-  findCueAtTime(time) {
-    if (!Number.isFinite(time)) return null
-
-    return this.cues.find(cue =>
-      Number.isFinite(cue?.start) &&
-      Number.isFinite(cue?.end) &&
-      time >= cue.start &&
-      time < cue.end
-    ) ?? null
-  }
-
-  updateRenderedWaveformPlayheads(time = this.video?.currentTime) {
-    const playheadTime = Number.isFinite(time) ? time : null
-    if (
-      playheadTime !== null &&
-      this.lastWaveformPlayheadTime !== null &&
-      Math.abs(playheadTime - this.lastWaveformPlayheadTime) < 0.025
-    ) {
-      return
-    }
-
-    this.lastWaveformPlayheadTime = playheadTime
-    this.cueList?.cueElementByCue?.forEach(cueEditor => {
-      cueEditor.updatePlayhead?.(playheadTime)
-    })
-  }
-
   getUniqueSpeakers() {
     return this.speakerController.getUniqueSpeakers({
       manualSpeakers: this.manualSpeakers,
@@ -1642,7 +1492,7 @@ class CueBert extends HTMLElement {
       allowMerge: !isSearching,
       video: this.video,
       activeCue: this.activeCue,
-      playbackCue: this.playbackCue,
+      playbackCue: this.previewTrack.playbackCue,
       speakers: this.getUniqueSpeakers(),
       envelope: this.envelope,
       frameDuration: this.frameDuration,
@@ -1672,8 +1522,8 @@ class CueBert extends HTMLElement {
             this.transportController.getMediaDuration()
           )
           this.transportController.updateUi()
-          this.updateRenderedWaveformPlayheads(this.video.currentTime)
-          this.syncActiveCueToPlayback('transport-seek')
+          this.previewTrack.updateWaveformPlayheads(this.video.currentTime)
+          this.previewTrack.sync('transport-seek')
         },
         onWaveformBoundaryChange: (cue, { edge, time }, cueEditor) => {
           cueEditor.updateBoundaryPreviewLabels(
@@ -1705,7 +1555,9 @@ class CueBert extends HTMLElement {
   syncCueListRenderState() {
     this.cueElementByCue = this.cueList.cueElementByCue
     this.activeCueElement = this.cueList.activeCueElement
-    this.playbackCueElement = this.cueList.playbackCueElement
+    if (this.cueList.playbackCueElement) {
+      this.previewTrack.playbackCueElement = this.cueList.playbackCueElement
+    }
     this.restoreKeyboardCueFocus()
   }
 
