@@ -196,17 +196,23 @@ async function commandOutput(command) {
 }
 
 async function commandResult(command, io = {}) {
+  const stdoutMode = io.stdout ?? "piped";
+  const stderrMode = io.stderr ?? "piped";
   const child = new Deno.Command(command[0], {
     args: command.slice(1),
     cwd: repoRoot.pathname,
-    stdout: io.stdout ?? "piped",
-    stderr: io.stderr ?? "piped",
+    stdout: stdoutMode,
+    stderr: stderrMode,
   });
   const result = await child.output();
 
   return {
     code: result.code,
-    stdout: result.stdout ? new TextDecoder().decode(result.stdout) : "",
-    stderr: result.stderr ? new TextDecoder().decode(result.stderr) : "",
+    stdout: stdoutMode === "piped"
+      ? new TextDecoder().decode(result.stdout)
+      : "",
+    stderr: stderrMode === "piped"
+      ? new TextDecoder().decode(result.stderr)
+      : "",
   };
 }
