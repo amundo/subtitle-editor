@@ -1,8 +1,8 @@
-const VERSION_FILES = [
+const VERSION_FILES = new Set([
   "src-tauri/tauri.conf.json",
   "src-tauri/Cargo.toml",
   "src-tauri/Cargo.lock",
-];
+]);
 
 const bump = Deno.args[0];
 
@@ -14,9 +14,21 @@ if (!bump || ["-h", "--help", "help"].includes(bump)) {
 const repoRoot = new URL("../", import.meta.url);
 const productName = "Cuebert";
 
-await assertCleanWorktree();
+const initialChanges = await changedFiles();
 await assertCommandExists("gh");
-await run(["deno", "task", "version", bump]);
+
+if (initialChanges.length === 0) {
+  await run(["deno", "task", "version", bump]);
+} else if (initialChanges.every((path) => VERSION_FILES.has(path))) {
+  console.log(
+    "Resuming release with existing version-file changes:",
+    initialChanges.join(", "),
+  );
+} else {
+  throw new Error(
+    `Release requires a clean worktree. Commit or stash these changes first:\n${await statusPorcelain()}`,
+  );
+}
 
 const version = await readVersion();
 const tag = `v${version}`;
@@ -119,7 +131,7 @@ async function findMatchingDmgs(dir, prefix) {
 }
 
 async function assertCleanWorktree() {
-  const status = await commandOutput(["git", "status", "--porcelain"]);
+  const status = await statusPorcelain();
   if (status.trim()) {
     throw new Error(
       `Release requires a clean worktree. Commit or stash these changes first:\n${status}`,
@@ -141,12 +153,8 @@ async function assertTagDoesNotExist(tag) {
 }
 
 async function assertOnlyExpectedFilesChanged() {
-  const status = await commandOutput(["git", "status", "--porcelain"]);
-  const changed = status
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => line.slice(3));
-  const unexpected = changed.filter((path) => !VERSION_FILES.includes(path));
+  const changed = await changedFiles();
+  const unexpected = changed.filter((path) => !VERSION_FILES.has(path));
 
   if (unexpected.length > 0) {
     throw new Error(
@@ -157,7 +165,7 @@ async function assertOnlyExpectedFilesChanged() {
 
 async function stageChangedVersionFiles() {
   const existing = [];
-  for (const path of VERSION_FILES) {
+  for (const path of VERSION_FILES.values()) {
     try {
       await Deno.stat(new URL(path, repoRoot));
       existing.push(path);
@@ -167,6 +175,17 @@ async function stageChangedVersionFiles() {
     }
   }
   await run(["git", "add", ...existing]);
+}
+
+async function changedFiles() {
+  return (await statusPorcelain())
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => line.slice(3));
+}
+
+async function statusPorcelain() {
+  return await commandOutput(["git", "status", "--porcelain"]);
 }
 
 async function currentBranch() {
