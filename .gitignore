@@ -21,3 +21,7 @@ cuebert-transcription-kit/models/*.bin
 cuebert-transcription-kit/whisper-cli
 cuebert/services/TranscriptParser.js
 cuebert-transcription-kit.zip
+
+# logs
+debug-logs/
+*.log

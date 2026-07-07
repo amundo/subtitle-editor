@@ -98,6 +98,22 @@ class CueEditor extends HTMLElement {
         </div>
 
         <textarea class="cue-text" data-role="text">${text ?? ''}</textarea>
+
+        <dialog class="delete-cue-dialog" data-role="deleteCueDialog"
+                aria-label="Delete cue confirmation">
+          <div class="delete-cue-dialog-panel">
+            <h2>Delete cue?</h2>
+            <p>This cannot be undone.</p>
+            <div class="delete-cue-dialog-actions">
+              <button class="cue-action-button" data-role="cancelDeleteCue" type="button">
+                Cancel
+              </button>
+              <button class="cue-action-button danger" data-role="confirmDeleteCue" type="button">
+                Delete
+              </button>
+            </div>
+          </div>
+        </dialog>
     `
 
     this.cacheEls()
@@ -112,6 +128,10 @@ class CueEditor extends HTMLElement {
     this.endLabel = this.querySelector('[data-role="endLabel"]')
     this.textarea = this.querySelector('[data-role="text"]')
     this.speakerPill = this.querySelector('[data-role="speakerPill"]')
+    this.deleteCueButton = this.querySelector('[data-role="deleteCue"]')
+    this.deleteCueDialog = this.querySelector('[data-role="deleteCueDialog"]')
+    this.cancelDeleteCueButton = this.querySelector('[data-role="cancelDeleteCue"]')
+    this.confirmDeleteCueButton = this.querySelector('[data-role="confirmDeleteCue"]')
   }
 
   updateSpeakerPill() {
@@ -186,8 +206,28 @@ class CueEditor extends HTMLElement {
       }
     })
 
-    this.querySelector('[data-role="deleteCue"]')?.addEventListener('click', () => {
+    this.deleteCueButton?.addEventListener('click', () => {
       this.confirmDeleteCue()
+    })
+
+    this.cancelDeleteCueButton?.addEventListener('click', () => {
+      this.closeDeleteCueDialog()
+    })
+
+    this.confirmDeleteCueButton?.addEventListener('click', () => {
+      this.closeDeleteCueDialog({ returnFocus: false })
+      if (this.onDeleteCue) this.onDeleteCue()
+    })
+
+    this.deleteCueDialog?.addEventListener('cancel', event => {
+      event.preventDefault()
+      this.closeDeleteCueDialog()
+    })
+
+    this.deleteCueDialog?.addEventListener('click', event => {
+      if (event.target === this.deleteCueDialog) {
+        this.closeDeleteCueDialog()
+      }
     })
   }
 
@@ -230,8 +270,31 @@ class CueEditor extends HTMLElement {
   }
 
   confirmDeleteCue() {
-    if (!window.confirm('Delete this cue? This cannot be undone.')) return
-    if (this.onDeleteCue) this.onDeleteCue()
+    if (!this.deleteCueDialog) return
+
+    if (typeof this.deleteCueDialog.showModal === 'function') {
+      if (!this.deleteCueDialog.open) {
+        this.deleteCueDialog.showModal()
+      }
+    } else {
+      this.deleteCueDialog.setAttribute('open', '')
+    }
+
+    this.confirmDeleteCueButton?.focus()
+  }
+
+  closeDeleteCueDialog({ returnFocus = true } = {}) {
+    if (!this.deleteCueDialog) return
+
+    if (typeof this.deleteCueDialog.close === 'function' && this.deleteCueDialog.open) {
+      this.deleteCueDialog.close()
+    } else {
+      this.deleteCueDialog.removeAttribute('open')
+    }
+
+    if (returnFocus) {
+      this.deleteCueButton?.focus()
+    }
   }
 
   focusText() {

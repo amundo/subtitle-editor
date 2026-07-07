@@ -12,6 +12,7 @@ use tauri::{
 };
 
 const LOG_FILE_NAME: &str = "cuebert.log";
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const TRANSCRIPTION_SETUP_GUIDE_MENU_ID: &str = "transcription_setup_guide";
 const TRANSCRIPTION_SETUP_GUIDE_WINDOW_LABEL: &str = "transcription-setup-guide";
 const CRASH_LOG_HELP_MENU_ID: &str = "crash_log_help";
@@ -37,10 +38,12 @@ fn now_millis() -> u128 {
         .unwrap_or_default()
 }
 
-fn append_log_line(log_dir: PathBuf, line: &str) -> Result<(), String> {
-    create_dir_all(&log_dir).map_err(|error| format!("failed to create log directory: {error}"))?;
+fn versioned_log_file_name() -> String {
+    format!("cuebert-{APP_VERSION}.log")
+}
 
-    let log_path = log_dir.join(LOG_FILE_NAME);
+fn append_log_line_to_file(log_dir: &Path, file_name: &str, line: &str) -> Result<(), String> {
+    let log_path = log_dir.join(file_name);
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
@@ -50,13 +53,28 @@ fn append_log_line(log_dir: PathBuf, line: &str) -> Result<(), String> {
     writeln!(file, "{line}").map_err(|error| format!("failed to write log file: {error}"))
 }
 
-#[tauri::command]
-fn append_log(entry: serde_json::Value) -> Result<(), String> {
-    let log_dir = fallback_log_dir();
-    let line = serde_json::json!({
+fn append_log_line(log_dir: PathBuf, line: &str) -> Result<(), String> {
+    create_dir_all(&log_dir).map_err(|error| format!("failed to create log directory: {error}"))?;
+
+    append_log_line_to_file(&log_dir, LOG_FILE_NAME, line)?;
+    append_log_line_to_file(&log_dir, &versioned_log_file_name(), line)
+}
+
+fn make_log_line(entry: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
       "timestamp_ms": now_millis(),
+      "app_version": APP_VERSION,
       "entry": entry,
-    });
+    })
+}
+
+#[tauri::command]
+fn append_log(mut entry: serde_json::Value) -> Result<(), String> {
+    let log_dir = fallback_log_dir();
+    if let Some(entry) = entry.as_object_mut() {
+        entry.insert("appVersion".to_string(), serde_json::json!(APP_VERSION));
+    }
+    let line = make_log_line(entry);
 
     append_log_line(log_dir, &line.to_string())
 }
@@ -195,15 +213,12 @@ fn open_transcription_setup_guide(app: tauri::AppHandle) {
     .build();
 
     if let Err(error) = result {
-        let line = serde_json::json!({
-          "timestamp_ms": now_millis(),
-          "entry": {
+        let line = make_log_line(serde_json::json!({
             "level": "error",
             "source": "rust",
             "message": "failed to open transcription setup guide",
             "error": error.to_string(),
-          },
-        });
+        }));
 
         let _ = append_log_line(fallback_log_dir(), &line.to_string());
     }
@@ -228,15 +243,12 @@ fn open_crash_log_help(app: tauri::AppHandle) {
     .build();
 
     if let Err(error) = result {
-        let line = serde_json::json!({
-          "timestamp_ms": now_millis(),
-          "entry": {
+        let line = make_log_line(serde_json::json!({
             "level": "error",
             "source": "rust",
             "message": "failed to open crash and log help",
             "error": error.to_string(),
-          },
-        });
+        }));
 
         let _ = append_log_line(fallback_log_dir(), &line.to_string());
     }
@@ -257,15 +269,12 @@ fn main() {
             "non-string panic payload".to_string()
         };
 
-        let line = serde_json::json!({
-          "timestamp_ms": now_millis(),
-          "entry": {
+        let line = make_log_line(serde_json::json!({
             "level": "panic",
             "source": "rust",
             "message": message,
             "location": location,
-          },
-        });
+        }));
 
         let _ = append_log_line(fallback_log_dir(), &line.to_string());
     }));

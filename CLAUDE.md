@@ -69,7 +69,7 @@ Pure web standards — no build step, no framework. The Tauri webview serves `cu
 ### Tauri backend (`src-tauri/src/main.rs`)
 
 Three Rust commands exposed to the frontend via `invoke()`:
-- `append_log` — appends JSON log entries to `~/Library/Logs/Cuebert/cuebert.log`
+- `append_log` — appends JSON log entries to `~/Library/Logs/Cuebert/cuebert.log` and a version-specific log such as `cuebert-0.8.2.log`
 - `find_matching_media` — auto-discovers a media file next to a transcript (same stem, common extensions)
 - `write_transcript_autosave` — writes `.cuebert.json` with safety checks (same directory, correct extension)
 
@@ -85,4 +85,4 @@ Three Rust commands exposed to the frontend via `invoke()`:
 
 ### Logging
 
-The app logs to `~/Library/Logs/Cuebert/cuebert.log` as newline-delimited JSON objects. `app-logger.js` patches `console.*` to route through the Tauri `append_log` command when running in desktop mode.
+The app logs to `~/Library/Logs/Cuebert/cuebert.log` and `~/Library/Logs/Cuebert/cuebert-<version>.log` as newline-delimited JSON objects. Each line includes top-level `app_version`, and webview entries also include `entry.appVersion`. `app-logger.js` patches `console.*` to route through the Tauri `append_log` command when running in desktop mode.
